@@ -1,0 +1,1 @@
+display -resize 1000x800 images/mathone.jpg
