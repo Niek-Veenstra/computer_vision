@@ -1,6 +1,4 @@
 import cv2
-from cv2.typing import MatLike
-
 
 image_str = input("Enter imaage from images dir.\n")
 dataset_basename = input("Enter image basename.\n")
