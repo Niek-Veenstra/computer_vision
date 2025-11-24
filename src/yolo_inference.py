@@ -1,4 +1,3 @@
-from cv2.typing import MatLike
 import ultralytics.models as models
 import cv2
 
