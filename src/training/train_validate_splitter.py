@@ -1,6 +1,6 @@
 import os, random, shutil
 
-base_dir = "dataset"
+base_dir = input("What is the base dir of dataset?\n")
 images_dir = os.path.join(base_dir, "images")
 labels_dir = os.path.join(base_dir, "labels")
 
