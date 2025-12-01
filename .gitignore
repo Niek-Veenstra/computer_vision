@@ -5,4 +5,5 @@ lib
 include
 bin
 .chpwd
+__pycache__
 
