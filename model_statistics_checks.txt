@@ -1,0 +1,11 @@
+Model: YOLO / OWN.
+1. Recall.
+2. Precision.
+3. Loss curves.
+
+Dataset:
+Class distribution.
+Image size and aspect ratio analysis.
+Duplicate detection.
+
+How does perform different background?
