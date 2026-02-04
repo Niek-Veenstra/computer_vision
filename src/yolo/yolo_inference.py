@@ -2,7 +2,7 @@ import ultralytics.models as models
 import cv2
 
 model = models.YOLO("runs/detect/symbol-detector4/weights/best.pt")
-img = cv2.imread("dataset/images/f1f0afa5-s2_69.png")
+img = cv2.imread("dataset_yolo/images/f1f0afa5-s2_69.png")
 
 if(img is None):
     exit(1)

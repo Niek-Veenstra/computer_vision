@@ -1,4 +1,3 @@
-import tensorflow.python.keras 
 import keras.layers as layers
 import keras.models as models
 
