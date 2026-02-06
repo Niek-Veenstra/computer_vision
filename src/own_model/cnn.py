@@ -1,10 +1,11 @@
 import keras.layers as layers
 import keras.models as models
 
-def build_cnn(input_shape=(128, 128, 3), num_classes=14):
+def build_cnn(num_classes=14):
     model = models.Sequential([
-        layers.Resizing(128,128),
-        layers.Conv2D(32, (3, 3), activation='relu', padding='same', input_shape=input_shape),
+        layers.Rescaling(1./255),
+
+        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
         layers.MaxPooling2D((2, 2)),
 
         layers.Conv2D(64, (3, 3), activation='relu', padding='same'),

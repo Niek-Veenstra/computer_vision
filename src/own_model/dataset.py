@@ -1,10 +1,8 @@
 from keras.utils import image_dataset_from_directory
 
-TARGET_SIZE = (128, 128)
-
 def get_dataset(dir, size, batch_size=32):
     train_ds = image_dataset_from_directory(
-        dir,
+        f"{dir}/train",
         image_size=size,
         batch_size=batch_size,
         validation_split=0.2,
@@ -14,7 +12,7 @@ def get_dataset(dir, size, batch_size=32):
     )
 
     val_ds = image_dataset_from_directory(
-        dir,
+        f"{dir}/val",
         image_size=size,
         batch_size=batch_size,
         validation_split=0.2,
@@ -23,3 +21,5 @@ def get_dataset(dir, size, batch_size=32):
         label_mode="int",
     )
     return train_ds, val_ds
+
+
