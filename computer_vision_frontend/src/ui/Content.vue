@@ -1,6 +1,8 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import Card from '@/components/Card.vue'
+</script>
 <template>
   <Card class="w-full">
-    <template #content> <div class="w-full">content here.</div></template>
+    <div class="w-full"><router-view /></div>
   </Card>
 </template>
