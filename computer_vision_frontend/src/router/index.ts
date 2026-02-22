@@ -37,7 +37,6 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from) => {
-  return true
   if (to.name === 'login') return true
 
   return {

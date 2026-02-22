@@ -2,7 +2,6 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { SettingsIcon, SunMoonIcon, XIcon } from 'lucide-vue-next'
 import { SidebarMenuButton } from '@/components/ui/sidebar'
-import { PopoverClose } from 'reka-ui'
 import Button from '@/components/ui/button/Button.vue'
 import { saveThemeService } from '@/services/save-theme'
 

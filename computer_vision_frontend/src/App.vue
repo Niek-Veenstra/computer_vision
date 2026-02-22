@@ -10,7 +10,7 @@ const route = useRoute()
   <SidebarProvider>
     <Sidebar v-if="route.name !== 'login'"></Sidebar>
     <main class="h-full max-h-dvh flex-1 p-4 space-x-4">
-      <SidebarTrigger />
+      <SidebarTrigger v-if="route.name !== 'login'" />
       <Content></Content>
     </main>
   </SidebarProvider>
