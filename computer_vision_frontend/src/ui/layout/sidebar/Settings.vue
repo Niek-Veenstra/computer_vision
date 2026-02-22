@@ -4,13 +4,28 @@ import { SettingsIcon, SunMoonIcon, XIcon } from 'lucide-vue-next'
 import { SidebarMenuButton } from '@/components/ui/sidebar'
 import { PopoverClose } from 'reka-ui'
 import Button from '@/components/ui/button/Button.vue'
-const setDarkMode = () => {
+import { saveThemeService } from '@/services/save-theme'
+
+const setDark = () => document.getElementsByTagName('html')[0]?.classList.add('dark')
+const removeDark = () => document.getElementsByTagName('html')[0]?.classList.remove('dark')
+console.log(saveThemeService.getTheme())
+switch (saveThemeService.getTheme()) {
+  case 'dark':
+    setDark()
+    break
+  case 'light':
+    removeDark()
+}
+
+const toggle = () => {
   const element = document.getElementsByTagName('html')[0]
   if (element?.classList.contains('dark')) {
-    element.classList.remove('dark')
+    removeDark()
+    saveThemeService.saveTheme('light')
     return
   }
-  element?.classList.add('dark')
+  setDark()
+  saveThemeService.saveTheme('dark')
 }
 </script>
 <template>
@@ -27,7 +42,7 @@ const setDarkMode = () => {
                   <XIcon></XIcon>
                 </Button>
               </PopoverClose>
-              <Button @click="setDarkMode" variant="outline">
+              <Button @click="toggle" variant="outline">
                 <SunMoonIcon></SunMoonIcon>
                 Toggle theme
               </Button>
