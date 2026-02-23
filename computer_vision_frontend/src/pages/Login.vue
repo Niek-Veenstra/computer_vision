@@ -4,28 +4,46 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { loginScheme } from '@/validation/login-validation'
+import { treeifyError } from 'zod'
 
 const email = ref('')
 const password = ref('')
 
-const emailError = computed((prev) => {})
-const passwordError = computed((prev) => {
-  console.log(prev)
-  if (password.value != prev) return { password: password.value }
-  return { password: password.value }
+type ErrorType = string | null
+const emailError = ref<ErrorType>(null)
+const passwordError = ref<ErrorType>(null)
+
+const emailErrorComputed = computed<{
+  email: string | null
+  invalid: boolean
+}>((prev) => {
+  if (email.value != prev?.email) return { email: email.value ?? '', invalid: false }
+  return { email: email.value ?? '', invalid: true }
+})
+const passwordErrorComputed = computed<{
+  password: string | null
+  invalid: boolean
+}>((prev) => {
+  if (password.value != prev?.password) return { password: password.value ?? '', invalid: false }
+  return { password: password.value ?? '', invalid: true }
 })
 
-const onLoginButtonClick = () => {
-  console.log('click')
+const invalidFormState = () => {
   const result = loginScheme.safeParse({
     email,
     password,
   })
   if (result.error) {
-    if (result.error.issues) return
+    const errorTree = treeifyError(result.error)
+    emailError.value = errorTree.properties?.mail?.errors.join(', ') ?? null
+    passwordError.value = errorTree.properties?.password?.errors.join(', ') ?? null
+    return true
   }
-  console.log(result)
-  if (result) console.log('hi')
+  return false
+}
+
+const onLoginButtonClick = () => {
+  if (invalidFormState()) return
 }
 </script>
 <template>
@@ -40,27 +58,38 @@ const onLoginButtonClick = () => {
           <CardContent>
             <form>
               <FieldGroup>
-                <Field :data-invalid="!(emailError && passwordError)">
-                  <!-- <FieldLabel for="email"> Email </FieldLabel> -->
-                  <FieldLabel htmlFor="email">Invalid Input</FieldLabel>
+                <Field :data-invalid="emailErrorComputed.invalid">
+                  <FieldLabel htmlFor="email">Email</FieldLabel>
                   <Input
                     :modelValue="email"
                     id="email"
                     type="email"
                     placeholder="m@example.com"
                     required
-                    aria-invalid
+                    :aria-invalid="emailErrorComputed.invalid"
                   ></Input>
-                  <FieldDescription> This field contains validation errors. </FieldDescription>
+                  <FieldDescription> {{ emailError }} </FieldDescription>
                 </Field>
-                <Field>
+                <Field :data-invalid="passwordErrorComputed.invalid">
                   <div class="flex items-center">
                     <FieldLabel for="password"> Password </FieldLabel>
-                    <a href="#" class="ml-auto text-sm underline-offset-4 hover:underline">
+                    <a
+                      href="#"
+                      class="ml-auto text-card-foreground underline-offset-4 hover:underline"
+                    >
                       Forgot your password?
                     </a>
                   </div>
-                  <Input :modelValue="password" id="password" type="password" required />
+                  <span class="flex gap-3 flex-col">
+                    <Input
+                      :modelValue="password"
+                      id="password"
+                      type="password"
+                      required
+                      :aria-invalid="passwordErrorComputed.invalid"
+                    />
+                    <FieldDescription> {{ passwordError }} </FieldDescription>
+                  </span>
                 </Field>
                 <Field>
                   <Button type="button" @click="onLoginButtonClick"> Login </Button>
