@@ -2,7 +2,9 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import FieldError from '@/components/ui/field/FieldError.vue'
 import { Input } from '@/components/ui/input'
+import { postAuthentication } from '@/fetch/auth'
 import { loginScheme } from '@/validation/login-validation'
 import { treeifyError } from 'zod'
 
@@ -13,37 +15,59 @@ type ErrorType = string | null
 const emailError = ref<ErrorType>(null)
 const passwordError = ref<ErrorType>(null)
 
-const emailErrorComputed = computed<{
-  email: string | null
-  invalid: boolean
-}>((prev) => {
-  if (email.value != prev?.email) return { email: email.value ?? '', invalid: false }
-  return { email: email.value ?? '', invalid: true }
-})
-const passwordErrorComputed = computed<{
-  password: string | null
-  invalid: boolean
-}>((prev) => {
-  if (password.value != prev?.password) return { password: password.value ?? '', invalid: false }
-  return { password: password.value ?? '', invalid: true }
-})
+const emailInvalid = computed(() => emailError.value !== null)
+const passwordInvalid = computed(() => passwordError.value !== null)
 
-const invalidFormState = () => {
-  const result = loginScheme.safeParse({
-    email,
-    password,
-  })
-  if (result.error) {
-    const errorTree = treeifyError(result.error)
-    emailError.value = errorTree.properties?.mail?.errors.join(', ') ?? null
-    passwordError.value = errorTree.properties?.password?.errors.join(', ') ?? null
-    return true
+let serverErrorMessage = ref('')
+
+let isFinished = ref(false)
+let statusCode = ref<number | null>(0)
+
+const nullNotEquals = <T,>(oldValue: T, newValue: T, ref: Ref<T | null>): void => {
+  if (oldValue !== newValue) {
+    ref.value = null
   }
-  return false
 }
 
-const onLoginButtonClick = () => {
-  if (invalidFormState()) return
+watch(email, (oldEmail, newEmail) => {
+  nullNotEquals(oldEmail, newEmail, emailError)
+})
+watch(password, (oldPassword, newPassword) => {
+  nullNotEquals(oldPassword, newPassword, passwordError)
+})
+
+const formIsInvalid = () => {
+  const result = loginScheme.safeParse({
+    email: email.value,
+    password: password.value,
+  })
+  if (!result.success) {
+    return {
+      success: false,
+      error: treeifyError(result.error),
+    } as const
+  }
+  return {
+    success: true,
+    error: null,
+  } as const
+}
+
+const onLoginButtonClick = async () => {
+  const { success, error } = formIsInvalid()
+  if (!success) {
+    emailError.value = error.properties?.email?.errors.join(', ') ?? null
+    passwordError.value = error.properties?.password?.errors.join(', ') ?? null
+    return
+  }
+  const {
+    isFinished: isFinishedLocal,
+    statusCode: statusCodeLocal,
+    data,
+  } = await postAuthentication({ email: email.value, password: password.value })
+  isFinished = isFinishedLocal
+  statusCode = statusCodeLocal
+  serverErrorMessage = data
 }
 </script>
 <template>
@@ -58,19 +82,20 @@ const onLoginButtonClick = () => {
           <CardContent>
             <form>
               <FieldGroup>
-                <Field :data-invalid="emailErrorComputed.invalid">
+                <Field :data-invalid="emailInvalid">
                   <FieldLabel htmlFor="email">Email</FieldLabel>
                   <Input
-                    :modelValue="email"
+                    :v-model="email"
+                    @update:modelValue="(value) => (email = value as string)"
                     id="email"
                     type="email"
                     placeholder="m@example.com"
                     required
-                    :aria-invalid="emailErrorComputed.invalid"
+                    :aria-invalid="emailInvalid"
                   ></Input>
                   <FieldDescription> {{ emailError }} </FieldDescription>
                 </Field>
-                <Field :data-invalid="passwordErrorComputed.invalid">
+                <Field :data-invalid="passwordInvalid">
                   <div class="flex items-center">
                     <FieldLabel for="password"> Password </FieldLabel>
                     <a
@@ -82,15 +107,19 @@ const onLoginButtonClick = () => {
                   </div>
                   <span class="flex gap-3 flex-col">
                     <Input
-                      :modelValue="password"
+                      :v-model="password"
+                      @update:modelValue="(value) => (password = value as string)"
                       id="password"
                       type="password"
                       required
-                      :aria-invalid="passwordErrorComputed.invalid"
+                      :aria-invalid="passwordInvalid"
                     />
                     <FieldDescription> {{ passwordError }} </FieldDescription>
                   </span>
                 </Field>
+                <FieldError v-if="isFinished && statusCode !== 200">
+                  {{ serverErrorMessage }}
+                </FieldError>
                 <Field>
                   <Button type="button" @click="onLoginButtonClick"> Login </Button>
                   <FieldDescription class="text-center">

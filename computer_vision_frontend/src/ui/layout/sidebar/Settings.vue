@@ -7,7 +7,6 @@ import { saveThemeService } from '@/services/save-theme'
 
 const setDark = () => document.getElementsByTagName('html')[0]?.classList.add('dark')
 const removeDark = () => document.getElementsByTagName('html')[0]?.classList.remove('dark')
-console.log(saveThemeService.getTheme())
 switch (saveThemeService.getTheme()) {
   case 'dark':
     setDark()
