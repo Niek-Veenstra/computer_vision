@@ -5,6 +5,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import FieldError from '@/components/ui/field/FieldError.vue'
 import { Input } from '@/components/ui/input'
 import { postAuthentication } from '@/fetch/auth'
+import { parseError } from '@/fetch/parse-error'
 import { loginScheme } from '@/validation/login-validation'
 import { treeifyError } from 'zod'
 
@@ -53,6 +54,11 @@ const formIsInvalid = () => {
   } as const
 }
 
+watch(serverErrorMessage, (newVal) => {
+  console.log(newVal)
+})
+const router = useRouter()
+
 const onLoginButtonClick = async () => {
   const { success, error } = formIsInvalid()
   if (!success) {
@@ -60,14 +66,13 @@ const onLoginButtonClick = async () => {
     passwordError.value = error.properties?.password?.errors.join(', ') ?? null
     return
   }
-  const {
-    isFinished: isFinishedLocal,
-    statusCode: statusCodeLocal,
-    data,
-  } = await postAuthentication({ email: email.value, password: password.value })
-  isFinished = isFinishedLocal
-  statusCode = statusCodeLocal
-  serverErrorMessage = data
+  const response = await postAuthentication({ email: email.value, password: password.value })
+  if (response.error.value !== null) {
+    const serverError = await parseError(response)
+    serverErrorMessage.value = serverError.message
+  }
+  isFinished.value = response.isFinished.value
+  statusCode.value = response.statusCode.value
 }
 </script>
 <template>
@@ -124,7 +129,7 @@ const onLoginButtonClick = async () => {
                   <Button type="button" @click="onLoginButtonClick"> Login </Button>
                   <FieldDescription class="text-center">
                     Don't have an account?
-                    <a href="#"> Sign up </a>
+                    <a @click="router.push('/register')" href="#"> Sign up </a>
                   </FieldDescription>
                 </Field>
               </FieldGroup>

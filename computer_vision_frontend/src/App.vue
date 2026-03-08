@@ -8,9 +8,9 @@ const route = useRoute()
 </script>
 <template>
   <SidebarProvider>
-    <Sidebar v-if="route.name !== 'login'"></Sidebar>
+    <Sidebar v-if="route.name !== 'login' && route.name !== 'register'"></Sidebar>
     <main class="h-full max-h-dvh flex-1 p-4 space-x-4">
-      <SidebarTrigger v-if="route.name !== 'login'" />
+      <SidebarTrigger v-if="route.name !== 'login' && route.name !== 'register'" />
       <Content></Content>
     </main>
   </SidebarProvider>

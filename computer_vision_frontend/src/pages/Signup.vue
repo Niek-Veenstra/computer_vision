@@ -1,0 +1,163 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+
+import { userRegistrationScheme } from '@/validation/registration-validation'
+import { createUser } from '@/fetch/user'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
+import FieldError from '@/components/ui/field/FieldError.vue'
+import { Input } from '@/components/ui/input'
+import { validateScheme } from '@/validation/validate-scheme'
+import { useFormField } from '@/composables/use-form-field'
+import { parseError } from '@/fetch/parse-error'
+import { useFormFieldValues } from '@/composables/use-form-field-values'
+
+const router = useRouter()
+
+const fields = {
+  firstName: useFormField(''),
+  lastName: useFormField(''),
+  email: useFormField(''),
+  password: useFormField(''),
+  confirmPassword: useFormField(''),
+}
+
+const formValues = useFormFieldValues(fields)
+
+const serverErrorMessage = ref('')
+const isFinished = ref(false)
+const statusCode = ref<number | null>(0)
+
+const onRegisterButtonClick = async () => {
+  const { success, error } = validateScheme(formValues.value, userRegistrationScheme)
+
+  if (!success) {
+    fields.firstName.error.value = error.properties?.firstName?.errors.join(', ') ?? null
+    fields.lastName.error.value = error.properties?.lastName?.errors.join(', ') ?? null
+    fields.email.error.value = error.properties?.email?.errors.join(', ') ?? null
+    fields.password.error.value = error.properties?.password?.errors.join(', ') ?? null
+    fields.confirmPassword.error.value =
+      error.properties?.passwordConfirm?.errors.join(', ') ?? null
+    return
+  }
+
+  const response = await createUser(formValues.value)
+
+  if (response.error.value != null) {
+    const message = await parseError(response)
+    serverErrorMessage.value = message.message ?? 'Registration failed'
+  }
+  isFinished.value = response.isFinished.value
+  statusCode.value = response.statusCode.value
+}
+</script>
+
+<template>
+  <div class="flex min-h-svh w-full items-center justify-center p-6">
+    <div class="w-full max-w-sm">
+      <div class="flex flex-col gap-1">
+        <Card>
+          <CardHeader class="text-center">
+            <CardTitle class="text-xl"> Create an account </CardTitle>
+            <CardDescription> Enter your information to create your account </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <form>
+              <FieldGroup class="gap-2">
+                <Field :data-invalid="fields.firstName.error.value">
+                  <FieldLabel htmlFor="name">First Name</FieldLabel>
+                  <Input
+                    v-model="fields.firstName.formValue.value"
+                    id="name"
+                    type="text"
+                    placeholder="Enter your first name"
+                    required
+                    :aria-invalid="fields.firstName.invalid"
+                  />
+                  <FieldDescription>{{ fields.firstName.error }}</FieldDescription>
+                </Field>
+
+                <Field :data-invalid="fields.lastName.invalid.value">
+                  <FieldLabel htmlFor="lastName">Last Name</FieldLabel>
+                  <Input
+                    v-model="fields.lastName.formValue.value"
+                    id="lastName"
+                    type="text"
+                    placeholder="Enter your last name"
+                    required
+                    :aria-invalid="fields.lastName.invalid.value"
+                  />
+                  <FieldDescription>{{ fields.lastName.error }}</FieldDescription>
+                </Field>
+
+                <Field :data-invalid="fields.email.invalid">
+                  <FieldLabel htmlFor="email">Email</FieldLabel>
+                  <Input
+                    v-model="fields.email.formValue.value"
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    required
+                    :aria-invalid="fields.email.invalid"
+                  />
+                  <FieldDescription>{{ fields.email.error }}</FieldDescription>
+                </Field>
+
+                <Field :data-invalid="fields.password.invalid">
+                  <FieldLabel htmlFor="password">Password</FieldLabel>
+                  <Input
+                    v-model="fields.password.formValue.value"
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    required
+                    :aria-invalid="fields.password.invalid"
+                  />
+                  <FieldDescription>{{ fields.password.error }}</FieldDescription>
+                </Field>
+
+                <Field :data-invalid="fields.confirmPassword.invalid">
+                  <FieldLabel htmlFor="confirmPassword"> Confirm Password </FieldLabel>
+                  <Input
+                    v-model="fields.confirmPassword.formValue.value"
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm your password"
+                    required
+                    :aria-invalid="fields.confirmPassword.invalid"
+                  />
+                  <FieldDescription>
+                    {{ fields.confirmPassword.error }}
+                  </FieldDescription>
+                </Field>
+
+                <FieldError v-if="isFinished && statusCode !== 201">
+                  {{ serverErrorMessage }}
+                </FieldError>
+
+                <Field>
+                  <Button type="button" @click="onRegisterButtonClick"> Create Account </Button>
+
+                  <FieldDescription class="text-center">
+                    Already have an account?
+                    <a @click="router.push('/register')" href="#"> Sign up </a>
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
+            </form>
+          </CardContent>
+        </Card>
+
+        <FieldDescription class="px-6 text-center">
+          By clicking continue, you agree to our
+          <a href="#">Terms of Service</a>
+          and
+          <a href="#">Privacy Policy</a>.
+        </FieldDescription>
+      </div>
+    </div>
+  </div>
+</template>

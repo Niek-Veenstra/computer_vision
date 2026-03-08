@@ -3,6 +3,7 @@ import Exporter from '@/pages/Exporter.vue'
 import Home from '@/pages/Home.vue'
 import Login from '@/pages/Login.vue'
 import Settings from '@/pages/Settings.vue'
+import Signup from '@/pages/Signup.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
@@ -16,6 +17,11 @@ const router = createRouter({
       path: '/login',
       component: Login,
       name: 'login',
+    },
+    {
+      path: '/register',
+      component: Signup,
+      name: 'register',
     },
     {
       path: '/home',
@@ -36,12 +42,6 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from) => {
-  if (to.name === 'login') return true
-
-  return {
-    name: 'login',
-  }
-})
+router.beforeEach((to, from) => {})
 
 export default router

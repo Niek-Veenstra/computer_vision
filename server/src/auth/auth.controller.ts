@@ -10,8 +10,6 @@ export class AuthController {
   @Post('/authenticate')
   @HttpCode(status.CREATED)
   async authenticate(@Body() loginInformation: LoginUserDto) {
-    console.log(loginInformation);
-
     return this.authService.authenticate(
       loginInformation.email,
       loginInformation.password,
