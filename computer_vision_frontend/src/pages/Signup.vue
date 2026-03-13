@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 import { userRegistrationScheme } from '@/validation/registration-validation'
 import { createUser } from '@/fetch/user'
-
+import { getLocalTimeZone, today } from '@internationalized/date'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -13,6 +13,8 @@ import { validateScheme } from '@/validation/validate-scheme'
 import { useFormField } from '@/composables/use-form-field'
 import { parseError } from '@/fetch/parse-error'
 import { useFormFieldValues } from '@/composables/use-form-field-values'
+import Datepicker from '@/components/ui/datepicker/Datepicker.vue'
+import { setFieldErrors } from '@/ui/form/setFieldErrors'
 
 const router = useRouter()
 
@@ -21,7 +23,8 @@ const fields = {
   lastName: useFormField(''),
   email: useFormField(''),
   password: useFormField(''),
-  confirmPassword: useFormField(''),
+  birthDate: useFormField(today(getLocalTimeZone()), (value) => value.toDate(getLocalTimeZone())),
+  passwordConfirm: useFormField(''),
 }
 
 const formValues = useFormFieldValues(fields)
@@ -32,19 +35,15 @@ const statusCode = ref<number | null>(0)
 
 const onRegisterButtonClick = async () => {
   const { success, error } = validateScheme(formValues.value, userRegistrationScheme)
-
   if (!success) {
-    fields.firstName.error.value = error.properties?.firstName?.errors.join(', ') ?? null
-    fields.lastName.error.value = error.properties?.lastName?.errors.join(', ') ?? null
-    fields.email.error.value = error.properties?.email?.errors.join(', ') ?? null
-    fields.password.error.value = error.properties?.password?.errors.join(', ') ?? null
-    fields.confirmPassword.error.value =
-      error.properties?.passwordConfirm?.errors.join(', ') ?? null
+    const objErrors = Object.fromEntries(
+      Object.entries(error.properties ?? {}).map(([key, value]) => [key, value.errors.join(', ')]),
+    )
+    setFieldErrors(fields, objErrors)
     return
   }
 
   const response = await createUser(formValues.value)
-
   if (response.error.value != null) {
     const message = await parseError(response)
     serverErrorMessage.value = message.message ?? 'Registration failed'
@@ -67,7 +66,7 @@ const onRegisterButtonClick = async () => {
           <CardContent>
             <form>
               <FieldGroup class="gap-2">
-                <Field :data-invalid="fields.firstName.error.value">
+                <Field :data-invalid="fields.firstName.invalid.value">
                   <FieldLabel htmlFor="name">First Name</FieldLabel>
                   <Input
                     v-model="fields.firstName.formValue.value"
@@ -93,7 +92,13 @@ const onRegisterButtonClick = async () => {
                   <FieldDescription>{{ fields.lastName.error }}</FieldDescription>
                 </Field>
 
-                <Field :data-invalid="fields.email.invalid">
+                <Field :data-invalid="fields.birthDate.invalid.value">
+                  <FieldLabel htmlFor="lastName">Birthdate</FieldLabel>
+                  <Datepicker v-model="fields.birthDate.formValue.value"> </Datepicker>
+                  <FieldDescription>{{ fields.birthDate.error }}</FieldDescription>
+                </Field>
+
+                <Field :data-invalid="fields.email.invalid.value">
                   <FieldLabel htmlFor="email">Email</FieldLabel>
                   <Input
                     v-model="fields.email.formValue.value"
@@ -101,12 +106,12 @@ const onRegisterButtonClick = async () => {
                     type="email"
                     placeholder="Enter your email"
                     required
-                    :aria-invalid="fields.email.invalid"
+                    :aria-invalid="fields.email.invalid.value"
                   />
                   <FieldDescription>{{ fields.email.error }}</FieldDescription>
                 </Field>
 
-                <Field :data-invalid="fields.password.invalid">
+                <Field :data-invalid="fields.password.invalid.value">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
                   <Input
                     v-model="fields.password.formValue.value"
@@ -114,26 +119,25 @@ const onRegisterButtonClick = async () => {
                     type="password"
                     placeholder="Enter your password"
                     required
-                    :aria-invalid="fields.password.invalid"
+                    :aria-invalid="fields.password.invalid.value"
                   />
                   <FieldDescription>{{ fields.password.error }}</FieldDescription>
                 </Field>
 
-                <Field :data-invalid="fields.confirmPassword.invalid">
-                  <FieldLabel htmlFor="confirmPassword"> Confirm Password </FieldLabel>
+                <Field :data-invalid="fields.passwordConfirm.invalid.value">
+                  <FieldLabel htmlFor="passwordConfirm"> Confirm Password </FieldLabel>
                   <Input
-                    v-model="fields.confirmPassword.formValue.value"
-                    id="confirmPassword"
+                    v-model="fields.passwordConfirm.formValue.value"
+                    id="passwordConfirm"
                     type="password"
                     placeholder="Confirm your password"
                     required
-                    :aria-invalid="fields.confirmPassword.invalid"
+                    :aria-invalid="fields.passwordConfirm.invalid.value"
                   />
                   <FieldDescription>
-                    {{ fields.confirmPassword.error }}
+                    {{ fields.passwordConfirm.error }}
                   </FieldDescription>
                 </Field>
-
                 <FieldError v-if="isFinished && statusCode !== 201">
                   {{ serverErrorMessage }}
                 </FieldError>
@@ -143,7 +147,7 @@ const onRegisterButtonClick = async () => {
 
                   <FieldDescription class="text-center">
                     Already have an account?
-                    <a @click="router.push('/register')" href="#"> Sign up </a>
+                    <a @click="router.push('/login')" href="#"> Log in </a>
                   </FieldDescription>
                 </Field>
               </FieldGroup>

@@ -18,14 +18,15 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException('User not found for given email.');
     }
-    const matches = await bcrypt.compare(user.password, password);
+    const matches = await bcrypt.compare(password, user.password);
+    if (!matches) {
+      throw new UnauthorizedException();
+    }
     const payload = {
       sub: user.id,
-      email: user.email,
     };
-    if (matches) {
-      return { token: this.jwtService.sign(payload) };
-    }
-    throw new UnauthorizedException();
+    return {
+      token: this.jwtService.sign(payload),
+    };
   }
 }

@@ -1,6 +1,6 @@
 import { ref, computed, watch } from 'vue'
 
-export function useFormField<T>(initialValue: T) {
+export function useFormField<T>(initialValue: T, transform?: (value: T) => any) {
   const formValue = ref<T>(initialValue)
   const error = ref<string | null>(null)
 
@@ -13,8 +13,9 @@ export function useFormField<T>(initialValue: T) {
   })
 
   return {
-    formValue: formValue,
+    formValue,
     error,
+    transform: transform,
     invalid,
   }
 }

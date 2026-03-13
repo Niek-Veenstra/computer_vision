@@ -67,12 +67,14 @@ const onLoginButtonClick = async () => {
     return
   }
   const response = await postAuthentication({ email: email.value, password: password.value })
+  isFinished.value = response.isFinished.value
+  statusCode.value = response.statusCode.value
   if (response.error.value !== null) {
     const serverError = await parseError(response)
     serverErrorMessage.value = serverError.message
+    return
   }
-  isFinished.value = response.isFinished.value
-  statusCode.value = response.statusCode.value
+  const token = response.data
 }
 </script>
 <template>

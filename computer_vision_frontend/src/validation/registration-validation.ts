@@ -4,5 +4,8 @@ export const userRegistrationScheme = z.object({
   lastName: z.string('Please enter text').nonempty('Please enter your last name'),
   email: z.email('Please enter a valid email'),
   password: z.string('Please enter your password').nonempty('Please enter your password'),
-  passwordConfirm: z.string('Please enter your password').nonempty('Please confirm your password'),
+  birthDate: z.date('Please enter your birth date'),
+  passwordConfirm: z
+    .string('Please confirm your password')
+    .nonempty('Please confirm your password'),
 })
