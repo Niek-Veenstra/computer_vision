@@ -1,6 +1,7 @@
 import { type UseFetchOptions } from '@vueuse/core'
 import { useFetch } from './instance'
 import type { DateValue } from '@internationalized/date'
+import type { User } from '@/domain/user'
 
 type CreateUserRequestBody = {
   firstName: string
@@ -21,4 +22,11 @@ export function createUser(
 
 export function getUser(id: number) {
   return useFetch(`/users/${id}`).json()
+}
+
+export function getCurrentUser() {
+  const token = localStorage.getItem('token')
+  return useFetch('/users/me', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  }).json()
 }

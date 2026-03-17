@@ -4,10 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import FieldError from '@/components/ui/field/FieldError.vue'
 import { Input } from '@/components/ui/input'
-import { postAuthentication } from '@/fetch/auth'
-import { parseError } from '@/fetch/parse-error'
 import { loginScheme } from '@/validation/login-validation'
+import { parseError } from '@/fetch/parse-error'
+import { postAuthentication } from '@/fetch/auth'
+import { getCurrentUser } from '@/fetch/user'
 import { treeifyError } from 'zod'
+import { useTokenStore } from '@/stores/token'
+import { useUserStore } from '@/stores/user'
 
 const email = ref('')
 const password = ref('')
@@ -21,8 +24,7 @@ const passwordInvalid = computed(() => passwordError.value !== null)
 
 let serverErrorMessage = ref('')
 
-let isFinished = ref(false)
-let statusCode = ref<number | null>(0)
+let isLoading = ref(false)
 
 const nullNotEquals = <T,>(oldValue: T, newValue: T, ref: Ref<T | null>): void => {
   if (oldValue !== newValue) {
@@ -54,9 +56,6 @@ const formIsInvalid = () => {
   } as const
 }
 
-watch(serverErrorMessage, (newVal) => {
-  console.log(newVal)
-})
 const router = useRouter()
 
 const onLoginButtonClick = async () => {
@@ -66,15 +65,38 @@ const onLoginButtonClick = async () => {
     passwordError.value = error.properties?.password?.errors.join(', ') ?? null
     return
   }
-  const response = await postAuthentication({ email: email.value, password: password.value })
-  isFinished.value = response.isFinished.value
-  statusCode.value = response.statusCode.value
-  if (response.error.value !== null) {
-    const serverError = await parseError(response)
-    serverErrorMessage.value = serverError.message
-    return
+
+  isLoading.value = true
+  serverErrorMessage.value = ''
+
+  try {
+    const authFetch = postAuthentication({
+      email: email.value,
+      password: password.value,
+    })
+    await authFetch.execute()
+    if (authFetch.error.value) {
+      const errorMessage = await parseError(authFetch)
+      serverErrorMessage.value = errorMessage.message
+      return
+    }
+    const token = authFetch.data.value
+    const tokenStore = useTokenStore()
+    tokenStore.setToken(token)
+    const userFetch = getCurrentUser()
+    await userFetch.execute()
+    if (userFetch.error.value) {
+      throw userFetch.error.value
+    }
+    const user = userFetch.data.value
+    const userStore = useUserStore()
+    userStore.setUser(user)
+    router.push('/home')
+  } catch (error) {
+    serverErrorMessage.value = 'An error occurred during login.'
+  } finally {
+    isLoading.value = false
   }
-  const token = response.data
 }
 </script>
 <template>
@@ -124,11 +146,13 @@ const onLoginButtonClick = async () => {
                     <FieldDescription> {{ passwordError }} </FieldDescription>
                   </span>
                 </Field>
-                <FieldError v-if="isFinished && statusCode !== 200">
+                <FieldError v-if="serverErrorMessage">
                   {{ serverErrorMessage }}
                 </FieldError>
                 <Field>
-                  <Button type="button" @click="onLoginButtonClick"> Login </Button>
+                  <Button type="button" @click="onLoginButtonClick" :disabled="isLoading">
+                    {{ isLoading ? 'Logging in...' : 'Login' }}
+                  </Button>
                   <FieldDescription class="text-center">
                     Don't have an account?
                     <a @click="router.push('/register')" href="#"> Sign up </a>
