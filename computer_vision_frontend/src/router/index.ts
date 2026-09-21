@@ -1,47 +1,13 @@
-import Documents from '@/pages/DocumentsPage.vue'
-import Exporter from '@/pages/ExporterPage.vue'
-import Home from '@/pages/HomePage.vue'
-import Login from '@/pages/LoginPage.vue'
-import Settings from '@/pages/SettingsPage.vue'
-import Signup from '@/pages/SignupPage.vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import { routes, handleHotUpdate } from 'vue-router/auto-routes'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: '/',
-      redirect: '/home',
-    },
-    {
-      path: '/login',
-      component: Login,
-      name: 'login',
-    },
-    {
-      path: '/register',
-      component: Signup,
-      name: 'register',
-    },
-    {
-      path: '/home',
-      component: Home,
-    },
-    {
-      path: '/documents',
-      component: Documents,
-    },
-    {
-      path: '/exporter',
-      component: Exporter,
-    },
-    {
-      path: '/settings',
-      component: Settings,
-    },
-  ],
+  routes,
 })
 
-router.beforeEach((to, from) => {})
+if (import.meta.hot) {
+  handleHotUpdate(router)
+}
 
 export default router

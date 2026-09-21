@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'LoginPage' })
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -99,8 +100,12 @@ const onLoginButtonClick = async () => {
   }
 }
 </script>
+
+<route lang="json">
+{ "name": "login", "meta": { "breadcrumb": "Login" } }
+</route>
 <template>
-  <div class="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+  <div class="flex w-full flex-1 items-center justify-center">
     <div class="w-full max-w-sm">
       <div class="flex flex-col gap-6">
         <Card>

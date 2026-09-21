@@ -1,4 +1,5 @@
 <script setup lang="ts">
+defineOptions({ name: 'SignupPage' })
 import { ref } from 'vue'
 
 import { userRegistrationScheme } from '@/validation/registration-validation'
@@ -53,8 +54,12 @@ const onRegisterButtonClick = async () => {
 }
 </script>
 
+<route lang="json">
+{ "name": "register", "meta": { "breadcrumb": "Sign up" } }
+</route>
+
 <template>
-  <div class="flex min-h-svh w-full items-center justify-center p-6">
+  <div class="flex w-full flex-1 items-center justify-center">
     <div class="w-full max-w-sm">
       <div class="flex flex-col gap-1">
         <Card>
