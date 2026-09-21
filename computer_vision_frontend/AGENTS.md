@@ -39,6 +39,10 @@
 
 - The user does not want agent tests or validation in the sandbox. Run builds, tests, lint and other verification commands directly outside the sandbox, using `require_escalated` when required by the execution environment. Do not try a sandboxed run first.
 - Inspect the current files and Git diff before editing; preserve existing work, including untracked files.
+- When asked to commit, inspect `git status --short` and `git diff --cached --name-status` immediately before committing; IDE staging may have changed since the last check.
+- Group changes into small commits by purpose, such as dependencies, a feature, shared UI and routing. Give each commit a clear description of the resulting change. Avoid one large commit for unrelated work.
+- Stage only the files needed for that commit. If other work is already staged, use explicit pathspecs with `git commit --only` so it stays staged; include a missing companion file only when the change needs it to work, and say which file was added.
+- After each commit, inspect the committed file list. At the end, check Git status and report the commit hashes, what each commit contains, and any work left uncommitted. Never mix changes under `../server` into a frontend commit.
 - After routing changes, run `npm.cmd run build-only` to generate route types, then `npm.cmd run type-check`.
 - Validate route names, dynamic parameters, redirects, breadcrumb ancestry and existing links when restructuring pages.
 - Run ESLint on the files you changed. The repository's `npm.cmd run lint` scripts apply fixes across the repository, so use targeted checks when appropriate.
