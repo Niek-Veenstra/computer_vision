@@ -39,7 +39,8 @@
 
 ## Verification and workflow
 
-- Do not run frontend tests, builds, typechecks, lint checks or other validation commands. The user performs frontend validation.
+- Do not run frontend tests, builds, typechecks or validation commands other than direct ESLint checks. The user performs those checks.
+- ESLint may be run directly through `node node_modules/eslint/bin/eslint.js` when relevant.
 - Inspect the current files and Git diff before editing; preserve existing work, including untracked files.
 - When asked to commit, inspect `git status --short` and `git diff --cached --name-status` immediately before committing; IDE staging may have changed since the last check.
 - Group changes into small commits by purpose, such as dependencies, a feature, shared UI and routing. Give each commit a clear description of the resulting change. Avoid one large commit for unrelated work.
