@@ -4,6 +4,7 @@
 
 - This directory contains the Vue 3 frontend of the document portal. The NestJS backend lives in `../server`.
 - Use TypeScript, Vue single-file components with `<script setup lang="ts">`, Pinia, Vue Router 5, Vite and Tailwind CSS 4.
+- Never use nested ternary expressions. Treat them as an absolute no-go; use clear `if` statements or a named helper instead.
 - Use npm and maintain `package-lock.json` when changing dependencies. On Windows, use `npm.cmd` in PowerShell.
 - Communicate with the user in Dutch. Keep interface text in English to match the existing application.
 
