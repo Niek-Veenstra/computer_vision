@@ -1,0 +1,8 @@
+# Allow direct use of this project's installed ESLint binary.
+prefix_rule(
+    pattern = ["node", "node_modules/eslint/bin/eslint.js"],
+    decision = "allow",
+    justification = "Project-local ESLint may run without a separate approval.",
+    match = ["node node_modules/eslint/bin/eslint.js src/scanners/scanners.service.ts"],
+    not_match = ["node node_modules/prettier/bin/prettier.cjs --write src/scanners/scanners.service.ts"],
+)
