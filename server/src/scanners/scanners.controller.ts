@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,6 +8,7 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -14,6 +16,7 @@ import {
 import { UserJwtGuard } from '../auth/user-jwt.guard';
 import type { AuthenticatedRequest } from '../auth/user-jwt.guard';
 import { CreateScannerDto } from './dto/create-scanner.dto';
+import { UpdateScannerDto } from './dto/update-scanner.dto';
 import { ScannerApiKeyGuard } from './scanner-api-key.guard';
 import type { ScannerRequest } from './scanner-api-key.guard';
 import { ScannersService } from './scanners.service';
@@ -42,13 +45,23 @@ export class ScannersController {
     return this.scanners.rotateKey(id, request.userId);
   }
 
+  @Patch(':id')
+  revoke(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateScannerDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (dto.revoked) return this.scanners.revoke(id, request.userId);
+    throw new BadRequestException('Scanner can only be revoked.');
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  revoke(
+  remove(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<void> {
-    return this.scanners.revoke(id, request.userId);
+    return this.scanners.remove(id, request.userId);
   }
 }
 

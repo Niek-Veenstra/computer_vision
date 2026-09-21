@@ -84,6 +84,52 @@ describe('ScannersService', () => {
     expect(update).toHaveBeenCalledTimes(1);
   });
 
+  it('deletes only a scanner owned by the requesting user', async () => {
+    const remove = jest.fn().mockResolvedValue({ affected: 1 });
+    const service = new ScannersService({
+      delete: remove,
+    } as unknown as Repository<Scanner>);
+
+    await service.remove(scannerId, ownerId);
+
+    expect(remove).toHaveBeenCalledWith({ id: scannerId, ownerId });
+  });
+
+  it('reports a missing scanner when deletion affects no row', async () => {
+    const remove = jest.fn().mockResolvedValue({ affected: 0 });
+    const service = new ScannersService({
+      delete: remove,
+    } as unknown as Repository<Scanner>);
+
+    await expect(service.remove(scannerId, ownerId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('revokes an owned scanner without deleting it', async () => {
+    const revokedAt = new Date('2026-09-21T12:00:00.000Z');
+    const update = jest.fn().mockResolvedValue({ affected: 1 });
+    const findOneBy = jest.fn().mockResolvedValue(scanner({ revokedAt }));
+    const remove = jest.fn();
+    const service = new ScannersService({
+      update,
+      findOneBy,
+      delete: remove,
+    } as unknown as Repository<Scanner>);
+
+    const result = await service.revoke(scannerId, ownerId);
+
+    expect(update).toHaveBeenCalledTimes(1);
+    const [where, changes] = update.mock.calls[0] as [
+      { id: string; ownerId: string },
+      { revokedAt: Date },
+    ];
+    expect(where).toMatchObject({ id: scannerId, ownerId });
+    expect(changes.revokedAt).toBeInstanceOf(Date);
+    expect(result.revokedAt).toBe(revokedAt.toISOString());
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid or revoked keys before returning scanner identity', async () => {
     const update = jest.fn().mockResolvedValue({ affected: 0 });
     const findOneBy = jest.fn();

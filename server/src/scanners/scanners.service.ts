@@ -80,12 +80,22 @@ export class ScannersService {
     return { scanner: toView(await this.findOwned(id, ownerId)), apiKey };
   }
 
-  async revoke(id: string, ownerId: string): Promise<void> {
+  async revoke(id: string, ownerId: string): Promise<ScannerView> {
     const updated = await this.scanners.update(
       { id, ownerId, revokedAt: IsNull() },
       { revokedAt: new Date() },
     );
-    if (updated.affected !== 1) await this.findOwned(id, ownerId);
+    const scanner = await this.findOwned(id, ownerId);
+    if (updated.affected !== 1 && !scanner.revokedAt) {
+      throw new ConflictException('Scanner could not be revoked.');
+    }
+    return toView(scanner);
+  }
+
+  async remove(id: string, ownerId: string): Promise<void> {
+    const deleted = await this.scanners.delete({ id, ownerId });
+    if (deleted.affected !== 1)
+      throw new NotFoundException('Scanner not found.');
   }
 
   async authenticate(apiKey: string) {
