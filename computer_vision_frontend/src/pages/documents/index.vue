@@ -1,6 +1,6 @@
 <script setup lang="ts">
 defineOptions({ name: 'DocumentsPage' })
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowUpRightIcon, FileTextIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,9 @@ import { documentText } from '@/domain/document'
 const store = useDocumentsStore()
 const router = useRouter()
 const search = ref('')
-store.load()
+onMounted(() => {
+  void store.load()
+})
 
 const filteredDocuments = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
@@ -22,9 +24,9 @@ const filteredDocuments = computed(() => {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 })
 
-function createDocument() {
-  const document = store.create()
-  if (document) router.push({ name: 'document', params: { documentId: document.id } })
+async function createDocument() {
+  const document = await store.create()
+  if (document) await router.push({ name: 'document', params: { documentId: document.id } })
 }
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
@@ -41,18 +43,26 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }
         <h1 class="text-3xl font-semibold tracking-tight">Documents</h1>
         <p class="mt-2 text-sm text-muted-foreground">A place for your ideas, notes and reports.</p>
       </div>
-      <Button @click="createDocument" class="self-start sm:self-auto">
+      <Button @click="createDocument" :disabled="store.creating" class="self-start sm:self-auto">
         <PlusIcon aria-hidden="true" />
-        New document
+        {{ store.creating ? 'Creating…' : 'New document' }}
       </Button>
     </div>
 
+    <div
+      v-if="store.loadError"
+      class="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+    >
+      <p role="alert">{{ store.loadError }}</p>
+      <Button variant="outline" size="sm" class="mt-3" @click="store.load">Retry loading</Button>
+    </div>
+
     <p
-      v-if="store.storageError"
+      v-if="store.createError"
       role="alert"
       class="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
     >
-      {{ store.storageError }}
+      {{ store.createError }}
     </p>
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -75,7 +85,10 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }
       </p>
     </div>
 
-    <div v-if="filteredDocuments.length" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <p v-if="store.loading" role="status" class="py-12 text-center text-sm text-muted-foreground">
+      Loading documents…
+    </p>
+    <div v-else-if="filteredDocuments.length" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <RouterLink
         v-for="document in filteredDocuments"
         :key="document.id"
@@ -105,7 +118,7 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }
     </div>
 
     <div
-      v-else
+      v-else-if="!store.loadError"
       class="flex min-h-80 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 py-12 text-center"
     >
       <div
@@ -127,10 +140,10 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }
       <Button v-if="search.trim()" variant="outline" class="mt-6" @click="search = ''"
         ><XIcon aria-hidden="true" />Clear search</Button
       >
-      <Button v-else class="mt-6" @click="createDocument"
+      <Button v-else class="mt-6" :disabled="store.creating" @click="createDocument"
         ><PlusIcon aria-hidden="true" />Create a document</Button
       >
     </div>
-    <p class="text-xs text-muted-foreground">Documents are saved in this browser.</p>
+    <p class="text-xs text-muted-foreground">Documents are saved on the server.</p>
   </section>
 </template>

@@ -7,12 +7,14 @@ import { useDocumentsStore } from '@/stores/documents'
 
 const route = useRoute()
 const documents = useDocumentsStore()
-documents.load()
 
 const documentTitle = computed(() => {
   if (route.name !== 'document') return ''
   const documentId = route.params.documentId
-  return documents.documents.find((document) => document.id === documentId)?.title ?? 'Document not found'
+  return (
+    documents.documents.find((document) => document.id === documentId)?.title ??
+    'Document'
+  )
 })
 
 const breadcrumbs = computed(() =>
@@ -20,10 +22,7 @@ const breadcrumbs = computed(() =>
     .filter((record) => typeof record.meta.breadcrumb === 'string')
     .map((record) => ({
       path: record.path,
-      label:
-        record.name === 'document'
-          ? documentTitle.value
-          : String(record.meta.breadcrumb),
+      label: record.name === 'document' ? documentTitle.value : String(record.meta.breadcrumb),
     })),
 )
 </script>
