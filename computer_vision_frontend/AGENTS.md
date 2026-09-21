@@ -32,22 +32,21 @@
 ## Documents
 
 - Use Tiptap for document editing and its JSON document model for content.
-- Documents currently persist in browser local storage through `src/stores/documents.ts`. This is provisional browser storage, not backend or account synchronization.
+- Documents are loaded and saved through the authenticated NestJS `/documents` API in `src/fetch/documents.ts`. Updates include the current `version`; preserve unsaved local edits when the API returns a conflict.
+- Documents are stored only through the backend API; do not add browser local storage for documents or legacy document imports.
 - Keep persistence in the store/service layer rather than individual components. Do not silently discard saved content on load or save errors.
 
 ## Verification and workflow
 
-- The user does not want agent tests or validation in the sandbox. Run builds, tests, lint and other verification commands directly outside the sandbox, using `require_escalated` when required by the execution environment. Do not try a sandboxed run first.
+- Do not run frontend tests, builds, typechecks, lint checks or other validation commands. The user performs frontend validation.
 - Inspect the current files and Git diff before editing; preserve existing work, including untracked files.
 - When asked to commit, inspect `git status --short` and `git diff --cached --name-status` immediately before committing; IDE staging may have changed since the last check.
 - Group changes into small commits by purpose, such as dependencies, a feature, shared UI and routing. Give each commit a clear description of the resulting change. Avoid one large commit for unrelated work.
 - Stage only the files needed for that commit. If other work is already staged, use explicit pathspecs with `git commit --only` so it stays staged; include a missing companion file only when the change needs it to work, and say which file was added.
 - After each commit, inspect the committed file list. At the end, check Git status and report the commit hashes, what each commit contains, and any work left uncommitted. Never mix changes under `../server` into a frontend commit.
-- After routing changes, run `npm.cmd run build-only` to generate route types, then `npm.cmd run type-check`.
+- After routing changes, leave route type generation and typechecking to the user.
 - Validate route names, dynamic parameters, redirects, breadcrumb ancestry and existing links when restructuring pages.
-- Run ESLint on the files you changed. The repository's `npm.cmd run lint` scripts apply fixes across the repository, so use targeted checks when appropriate.
-- Use focused tests for behavior with a meaningful regression risk. Avoid adding tests that only repeat markup or spacing classes.
-- Report pre-existing verification failures separately from errors introduced by your changes; do not claim the complete build passes when only `build-only` passes.
+- Review changed code and Git diffs without running validation commands. Report any checks as not run when handing work over.
 
 ## References
 
