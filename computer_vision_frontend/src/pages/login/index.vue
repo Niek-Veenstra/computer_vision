@@ -24,17 +24,17 @@ const serverErrorMessage = ref('')
 
 const isLoading = ref(false)
 
-const nullNotEquals = <T,>(oldValue: T, newValue: T, ref: Ref<T | null>): void => {
+const setRefValueNullWhenNotEquals = <T,>(oldValue: T, newValue: T, ref: Ref<T | null>): void => {
   if (oldValue !== newValue) {
     ref.value = null
   }
 }
 
 watch(email, (oldEmail, newEmail) => {
-  nullNotEquals(oldEmail, newEmail, emailError)
+  setRefValueNullWhenNotEquals(oldEmail, newEmail, emailError)
 })
 watch(password, (oldPassword, newPassword) => {
-  nullNotEquals(oldPassword, newPassword, passwordError)
+  setRefValueNullWhenNotEquals(oldPassword, newPassword, passwordError)
 })
 
 const formIsInvalid = () => {
