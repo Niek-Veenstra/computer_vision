@@ -7,7 +7,7 @@ type AuthenticationRequestBody = {
 }
 
 export function postAuthentication(body: AuthenticationRequestBody, options?: UseFetchOptions) {
-  return useFetch('/auth/authenticate', options ?? {})
+  return useFetch('/auth/authenticate', { ...options, immediate: false })
     .post(body)
-    .json()
+    .json<{ token: string }>()
 }

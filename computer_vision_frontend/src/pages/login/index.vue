@@ -58,6 +58,7 @@ const router = useRouter()
 const route = useRoute('login')
 
 const onLoginButtonClick = async () => {
+  if (isLoading.value) return
   const { success, error } = formIsInvalid()
   if (!success) {
     emailError.value = error.properties?.email?.errors.join(', ') ?? null
@@ -81,7 +82,7 @@ const onLoginButtonClick = async () => {
           : 'An error occurred during login.'
       return
     }
-    const token = (authFetch.data.value as { token?: string } | null)?.token
+    const token = authFetch.data.value?.token
     if (!token) throw new Error('Authentication response did not contain a token.')
     const tokenStore = useTokenStore()
     tokenStore.setToken(token)
@@ -161,7 +162,7 @@ const onLoginButtonClick = async () => {
                   </Button>
                   <FieldDescription class="text-center">
                     Don't have an account?
-                    <a @click="router.push('/register')" href="#"> Sign up </a>
+                    <RouterLink :to="{ name: 'register' }">Sign up</RouterLink>
                   </FieldDescription>
                 </Field>
               </FieldGroup>

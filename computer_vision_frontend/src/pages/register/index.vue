@@ -16,8 +16,6 @@ import { useFormFieldValues } from '@/composables/use-form-field-values'
 import Datepicker from '@/components/ui/datepicker/Datepicker.vue'
 import { setFieldErrors } from '@/ui/form/setFieldErrors'
 
-const router = useRouter()
-
 const fields = {
   firstName: useFormField(''),
   lastName: useFormField(''),
@@ -151,7 +149,7 @@ const onRegisterButtonClick = async () => {
 
                   <FieldDescription class="text-center">
                     Already have an account?
-                    <a @click="router.push('/login')" href="#"> Log in </a>
+                    <RouterLink :to="{ name: 'login' }">Log in</RouterLink>
                   </FieldDescription>
                 </Field>
               </FieldGroup>
