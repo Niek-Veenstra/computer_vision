@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineOptions({ name: 'DatePickerInput' })
+
 import type { DateValue } from '@internationalized/date'
 import { DateFormatter, getLocalTimeZone, today } from '@internationalized/date'
 import { CalendarIcon } from 'lucide-vue-next'
@@ -14,7 +16,7 @@ const emits = defineEmits<{
   (e: 'update:modelValue', payload: DateValue | undefined): void
 }>()
 const props = defineProps<{
-  modelValue: DateValue
+  modelValue?: DateValue
 }>()
 </script>
 <template>

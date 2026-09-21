@@ -1,7 +1,19 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, shallowRef, watch } from 'vue'
+import type { ComputedRef, Ref, ShallowRef } from 'vue'
 
-export function useFormField<T>(initialValue: T, transform?: (value: T) => any) {
-  const formValue = ref<T>(initialValue)
+type FormField<T> = {
+  formValue: ShallowRef<T>
+  error: Ref<string | null>
+  invalid: ComputedRef<boolean>
+}
+
+export function useFormField<T>(initialValue: T): FormField<T>
+export function useFormField<T, Output>(
+  initialValue: T,
+  transform: (value: T) => Output,
+): FormField<T> & { transform: (value: T) => Output }
+export function useFormField<T, Output>(initialValue: T, transform?: (value: T) => Output) {
+  const formValue = shallowRef<T>(initialValue)
   const error = ref<string | null>(null)
 
   const invalid = computed(() => error.value !== null)
@@ -15,7 +27,7 @@ export function useFormField<T>(initialValue: T, transform?: (value: T) => any) 
   return {
     formValue,
     error,
-    transform: transform,
+    transform,
     invalid,
   }
 }

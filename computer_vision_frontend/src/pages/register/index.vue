@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import { userRegistrationScheme } from '@/validation/registration-validation'
 import { createUser } from '@/fetch/user'
 import { getLocalTimeZone, today } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -21,7 +22,10 @@ const fields = {
   lastName: useFormField(''),
   email: useFormField(''),
   password: useFormField(''),
-  birthDate: useFormField(today(getLocalTimeZone()), (value) => value.toDate(getLocalTimeZone())),
+  birthDate: useFormField<DateValue | undefined, string | undefined>(
+    today(getLocalTimeZone()),
+    (value) => value?.toString(),
+  ),
   passwordConfirm: useFormField(''),
 }
 
@@ -32,16 +36,19 @@ const isFinished = ref(false)
 const statusCode = ref<number | null>(0)
 
 const onRegisterButtonClick = async () => {
-  const { success, error } = validateScheme(formValues.value, userRegistrationScheme)
-  if (!success) {
+  const validation = validateScheme(formValues.value, userRegistrationScheme)
+  if (!validation.success) {
     const objErrors = Object.fromEntries(
-      Object.entries(error.properties ?? {}).map(([key, value]) => [key, value.errors.join(', ')]),
+      Object.entries(validation.error.properties ?? {}).map(([key, value]) => [
+        key,
+        value.errors.join(', '),
+      ]),
     )
     setFieldErrors(fields, objErrors)
     return
   }
 
-  const response = await createUser(formValues.value)
+  const response = await createUser(validation.data)
   if (response.error.value != null) {
     serverErrorMessage.value =
       response.error.value instanceof Error ? response.error.value.message : 'Registration failed'

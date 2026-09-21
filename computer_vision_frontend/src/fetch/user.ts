@@ -1,6 +1,5 @@
 import { type UseFetchOptions } from '@vueuse/core'
 import { useFetch } from './instance'
-import type { DateValue } from '@internationalized/date'
 import type { User } from '@/domain/user'
 
 type CreateUserRequestBody = {
@@ -8,7 +7,7 @@ type CreateUserRequestBody = {
   lastName: string
   email: string
   password: string
-  birthDate: DateValue
+  birthDate: string
 }
 
 export function createUser(
