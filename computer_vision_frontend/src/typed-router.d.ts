@@ -83,6 +83,28 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/scanners': RouteRecordInfo<
+      '/scanners',
+      '/scanners',
+      Record<never, never>,
+      Record<never, never>,
+      | 'scanner'
+      | 'scanners'
+    >,
+    'scanners': RouteRecordInfo<
+      'scanners',
+      '/scanners',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    'scanner': RouteRecordInfo<
+      'scanner',
+      '/scanners/:scannerId',
+      { scannerId: ParamValue<true> },
+      { scannerId: ParamValue<false> },
+      | never
+    >,
     'settings': RouteRecordInfo<
       'settings',
       '/settings',
@@ -150,6 +172,26 @@ declare module 'vue-router/auto-routes' {
     'src/pages/register/index.vue': {
       routes:
         | 'register'
+      views:
+        | never
+    }
+    'src/pages/scanners.vue': {
+      routes:
+        | '/scanners'
+        | 'scanner'
+        | 'scanners'
+      views:
+        | 'default'
+    }
+    'src/pages/scanners/index.vue': {
+      routes:
+        | 'scanners'
+      views:
+        | never
+    }
+    'src/pages/scanners/[scannerId].vue': {
+      routes:
+        | 'scanner'
       views:
         | never
     }

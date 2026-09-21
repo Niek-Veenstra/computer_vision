@@ -4,9 +4,11 @@ import { useRoute } from 'vue-router'
 import { ChevronRightIcon } from 'lucide-vue-next'
 import SidebarTrigger from '@/components/ui/sidebar/SidebarTrigger.vue'
 import { useDocumentsStore } from '@/stores/documents'
+import { useScannersStore } from '@/stores/scanners'
 
 const route = useRoute()
 const documents = useDocumentsStore()
+const scanners = useScannersStore()
 
 const documentTitle = computed(() => {
   if (route.name !== 'document') return ''
@@ -17,12 +19,24 @@ const documentTitle = computed(() => {
   )
 })
 
+const scannerName = computed(() => {
+  if (route.name !== 'scanner') return ''
+  const scannerId = route.params.scannerId
+  return scanners.scanners.find((scanner) => scanner.id === scannerId)?.name ?? 'Scanner'
+})
+
+function breadcrumbLabel(name: unknown, breadcrumb: unknown) {
+  if (name === 'document') return documentTitle.value
+  if (name === 'scanner') return scannerName.value
+  return String(breadcrumb)
+}
+
 const breadcrumbs = computed(() =>
   route.matched
     .filter((record) => typeof record.meta.breadcrumb === 'string')
     .map((record) => ({
       path: record.path,
-      label: record.name === 'document' ? documentTitle.value : String(record.meta.breadcrumb),
+      label: breadcrumbLabel(record.name, record.meta.breadcrumb),
     })),
 )
 </script>

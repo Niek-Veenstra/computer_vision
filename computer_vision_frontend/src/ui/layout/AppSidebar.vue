@@ -2,7 +2,7 @@
 import NavChip from '@/ui/layout/NavChip.vue'
 import Avatar from '@/components/ui/avatar/Avatar.vue'
 import Separator from '@/components/ui/separator/Separator.vue'
-import { ArrowRightFromLineIcon, FileIcon, HomeIcon } from 'lucide-vue-next'
+import { ArrowRightFromLineIcon, FileIcon, HomeIcon, ScanLineIcon } from 'lucide-vue-next'
 
 import {
   Sidebar,
@@ -22,6 +22,7 @@ type NavChip = InstanceType<typeof NavChip>['$props']
 const navChips: NavChip[] = [
   { icon: HomeIcon, label: 'Home', tooltip: 'Home', to: '/home' },
   { icon: FileIcon, label: 'Documents', tooltip: 'Documents', to: '/documents' },
+  { icon: ScanLineIcon, label: 'Scanners', tooltip: 'Scanners', to: '/scanners' },
   { icon: ArrowRightFromLineIcon, label: 'Exporter', tooltip: 'Exporter', to: '/exporter' },
 ]
 </script>
