@@ -31,6 +31,11 @@
 $ npm install
 ```
 
+Copy `.env.example` to `.env` and set the database connection values and
+`JWT_SECRET`. The database settings are required by both the NestJS application
+and the TypeORM data source. `DB_TYPE` currently supports `postgres`.
+The example database credentials match the current `docker-compose.yml`.
+
 ## Compile and run the project
 
 ```bash
