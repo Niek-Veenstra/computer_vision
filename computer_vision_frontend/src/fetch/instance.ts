@@ -31,18 +31,18 @@ const instance = createFetch({
       const serverMessage =
         typeof data === 'object' && data !== null && 'message' in data ? data.message : null
       const message = Array.isArray(serverMessage) ? serverMessage.join(', ') : serverMessage
-      return {
-        error: new ApiError(
-          status,
-          typeof message === 'string'
-            ? message
-            : status === 0
-              ? 'Could not connect to the server. Try again.'
-              : error instanceof Error && error.message
-                ? error.message
-                : 'The request failed. Try again.',
-        ),
+      let errorMessage: string
+      if (typeof message === 'string') {
+        errorMessage = message
+      } else if (status === 0) {
+        errorMessage = 'Could not connect to the server. Try again.'
+      } else if (error instanceof Error && error.message) {
+        errorMessage = error.message
+      } else {
+        errorMessage = 'The request failed. Try again.'
       }
+
+      return { error: new ApiError(status, errorMessage) }
     },
   },
 })
