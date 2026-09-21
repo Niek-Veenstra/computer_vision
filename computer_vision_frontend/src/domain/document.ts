@@ -4,8 +4,10 @@ export type PortalDocument = {
   id: string
   title: string
   content: JSONContent
+  version: number
   createdAt: string
   updatedAt: string
+  updatedById: string
 }
 
 export function documentText(content: JSONContent): string {
