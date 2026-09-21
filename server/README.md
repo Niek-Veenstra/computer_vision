@@ -38,8 +38,10 @@ The example database credentials match the current `docker-compose.yml`.
 
 ## Documents API
 
-Run `npm run db:migrate` after the existing `user` table has been created. This
-creates the `documents` table with a foreign key from `updated_by` to `user.id`.
+Run `npm run db:migrate` against an empty PostgreSQL database. This creates the
+`user` table first, then the `documents` table with a foreign key from
+`updated_by` to `user.id`. Migrations live in `src/database/migrations`; the
+command reads connection settings from `.env`.
 The documents endpoints require `Authorization: Bearer <token>` from
 `POST /auth/authenticate`.
 
