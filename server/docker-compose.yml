@@ -4,7 +4,7 @@ services:
     container_name: postgres_db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "6084:5432"
     environment:
       POSTGRES_USER: computer-vision-app
       POSTGRES_PASSWORD: computer-vision-app
