@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { type LucideProps } from 'lucide-vue-next'
 import type { FunctionalComponent } from 'vue'
+import { useRoute } from 'vue-router'
 import SidebarMenuButton from '@/components/ui/sidebar/SidebarMenuButton.vue'
 const props = defineProps<{
   icon?: FunctionalComponent<LucideProps>
@@ -8,13 +9,17 @@ const props = defineProps<{
   tooltip?: string
   to: string
 }>()
-const router = useRouter()
+const route = useRoute()
 </script>
 <template>
-  <SidebarMenuButton :tooltip="props.tooltip" as-child>
-    <a @click="router.push(props.to)">
+  <SidebarMenuButton
+    :tooltip="props.tooltip"
+    :is-active="route.path === props.to || route.path.startsWith(`${props.to}/`)"
+    as-child
+  >
+    <RouterLink :to="props.to">
       <component :is="props.icon"></component>
       <span>{{ props.label }}</span>
-    </a>
+    </RouterLink>
   </SidebarMenuButton>
 </template>
