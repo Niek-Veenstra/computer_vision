@@ -14,13 +14,13 @@ import {
 } from '@nestjs/common';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
-import { DocumentsAuthGuard } from './documents-auth.guard';
-import type { AuthenticatedRequest } from './documents-auth.guard';
+import { UserJwtGuard } from '../auth/user-jwt.guard';
+import type { AuthenticatedRequest } from '../auth/user-jwt.guard';
 import { Document } from './documents.entity';
 import { DocumentsService } from './documents.service';
 
 @Controller('documents')
-@UseGuards(DocumentsAuthGuard)
+@UseGuards(UserJwtGuard)
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 

@@ -6,14 +6,14 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { isUUID } from 'class-validator';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 export interface AuthenticatedRequest extends Request {
   userId: string;
 }
 
 @Injectable()
-export class DocumentsAuthGuard implements CanActivate {
+export class UserJwtGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

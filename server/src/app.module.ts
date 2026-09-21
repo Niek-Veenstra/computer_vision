@@ -10,19 +10,22 @@ import { ConfigModule } from '@nestjs/config';
 import { getDatabaseConfig } from './database.config';
 import { DocumentsModule } from './documents/documents.module';
 import { Document } from './documents/documents.entity';
+import { Scanner } from './scanners/scanner.entity';
+import { ScannersModule } from './scanners/scanners.module';
 
 @Module({
   imports: [
     AuthModule,
     UsersModule,
     DocumentsModule,
+    ScannersModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => ({
         ...getDatabaseConfig(process.env),
-        entities: [User, Document],
+        entities: [User, Document, Scanner],
       }),
     }),
   ],
