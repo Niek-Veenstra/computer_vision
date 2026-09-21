@@ -3,6 +3,7 @@
 - Deze backend moet een REST API zijn.
 - Ontwerp nieuwe endpoints rond resources en gebruik passende HTTP-methoden en statuscodes.
 - Gebruik JSON voor request- en responsebodies, tenzij een endpoint een ander formaat nodig heeft (zoals een bestand).
+- Gebruik nergens geneste ternary-expressies. Dit is een absoluut verbod; gebruik duidelijke `if`-statements of een benoemde hulpfunctie.
 
 ## Git-commits en controles
 
