@@ -1,14 +1,14 @@
 services:
-  database:
+  computer-vision-backend:
     image: postgres:16
     container_name: postgres_db
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: app
+      POSTGRES_USER: computer-vision-app
+      POSTGRES_PASSWORD: computer-vision-app
+      POSTGRES_DB: computer-vision-app
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
