@@ -2,14 +2,16 @@
 defineOptions({ name: 'ScannerPage' })
 
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { ArrowLeftIcon, ScanLineIcon } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeftIcon, ScanLineIcon, Trash2Icon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useScannersStore } from '@/stores/scanners'
 
 const route = useRoute()
+const router = useRouter()
 const store = useScannersStore()
 const loading = ref(true)
+const confirmingDelete = ref(false)
 const scanner = computed(() =>
   store.scanners.find((item) => item.id === String(route.params.scannerId)),
 )
@@ -28,6 +30,11 @@ onMounted(() => void loadScanner())
 
 function formatDate(date: string) {
   return dateFormatter.format(new Date(date))
+}
+
+async function deleteScanner() {
+  if (!scanner.value || !confirmingDelete.value) return
+  if (await store.remove(scanner.value.id)) await router.replace({ name: 'scanners' })
 }
 </script>
 
@@ -93,6 +100,30 @@ function formatDate(date: string) {
       <p class="text-sm text-muted-foreground">
         Manage this scanner's API key from the scanners overview. Keys are only shown when they are created or rotated.
       </p>
+
+      <div class="rounded-xl border border-destructive/30 bg-card p-5">
+        <h2 class="font-semibold">Delete scanner</h2>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Permanently remove this scanner and disable its API key.
+        </p>
+        <p v-if="store.actionErrors[scanner.id]" class="mt-3 text-sm text-destructive" role="alert">
+          {{ store.actionErrors[scanner.id] }}
+        </p>
+        <div v-if="confirmingDelete" class="mt-4 space-y-3">
+          <p class="text-sm">Delete {{ scanner.name }} permanently?</p>
+          <div class="flex flex-wrap gap-2">
+            <Button variant="destructive" :disabled="!!store.busyId" @click="deleteScanner">
+              {{ store.busyId === scanner.id ? 'Deleting…' : 'Confirm delete' }}
+            </Button>
+            <Button variant="outline" :disabled="!!store.busyId" @click="confirmingDelete = false">
+              Cancel
+            </Button>
+          </div>
+        </div>
+        <Button v-else class="mt-4" variant="destructive" @click="confirmingDelete = true">
+          <Trash2Icon aria-hidden="true" />Delete scanner
+        </Button>
+      </div>
     </template>
     <div v-else class="flex min-h-80 flex-col items-center justify-center text-center">
       <ScanLineIcon class="mb-4 size-10 text-muted-foreground" aria-hidden="true" />

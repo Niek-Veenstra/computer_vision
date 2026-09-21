@@ -29,5 +29,11 @@ export function rotateScannerKey(id: string) {
 }
 
 export function revokeScanner(id: string) {
+  return useFetch(`/scanners/${encodeURIComponent(id)}`, {}, scannerFetchOptions)
+    .patch({ revoked: true })
+    .json<Scanner>()
+}
+
+export function deleteScanner(id: string) {
   return useFetch(`/scanners/${encodeURIComponent(id)}`, {}, scannerFetchOptions).delete()
 }

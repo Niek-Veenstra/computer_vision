@@ -121,7 +121,7 @@ async function confirmAction() {
     <div v-if="showCreate" class="rounded-xl border bg-card p-5 shadow-xs">
       <h2 class="font-semibold">Add a scanner</h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Give this Raspberry Pi a name you will recognize.
+        Give this device a name you will recognize.
       </p>
       <form class="mt-4 flex flex-col gap-3 sm:flex-row" @submit.prevent="addScanner">
         <Input
@@ -315,7 +315,7 @@ async function confirmAction() {
         {{
           search.trim()
             ? 'Try another scanner name.'
-            : 'Add a Raspberry Pi to give it its own API key.'
+            : 'Add a device to give it its own API key.'
         }}
       </p>
       <Button v-if="search.trim()" variant="outline" class="mt-6" @click="search = ''">

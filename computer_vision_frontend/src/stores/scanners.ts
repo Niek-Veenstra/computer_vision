@@ -2,7 +2,13 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { UseFetchReturn } from '@vueuse/core'
 import type { Scanner } from '@/domain/scanner'
-import { createScanner, listScanners, revokeScanner, rotateScannerKey } from '@/fetch/scanners'
+import {
+  createScanner,
+  deleteScanner,
+  listScanners,
+  revokeScanner,
+  rotateScannerKey,
+} from '@/fetch/scanners'
 
 async function resultOf<T>(request: UseFetchReturn<T>): Promise<T> {
   await request.execute()
@@ -81,11 +87,26 @@ export const useScannersStore = defineStore('scanners', () => {
     busyId.value = id
     actionErrors.value[id] = ''
     try {
-      const request = revokeScanner(id)
+      upsert(await resultOf(revokeScanner(id)))
+      return true
+    } catch (error) {
+      actionErrors.value[id] = messageOf(error)
+      return false
+    } finally {
+      busyId.value = null
+    }
+  }
+
+  async function remove(id: string) {
+    if (busyId.value) return false
+    busyId.value = id
+    actionErrors.value[id] = ''
+    try {
+      const request = deleteScanner(id)
       await request.execute()
       if (request.error.value) throw request.error.value
-      const scanner = scanners.value.find((item) => item.id === id)
-      if (scanner) scanner.revokedAt = new Date().toISOString()
+      scanners.value = scanners.value.filter((scanner) => scanner.id !== id)
+      delete actionErrors.value[id]
       return true
     } catch (error) {
       actionErrors.value[id] = messageOf(error)
@@ -107,5 +128,6 @@ export const useScannersStore = defineStore('scanners', () => {
     create,
     rotateKey,
     revoke,
+    remove,
   }
 })
