@@ -12,7 +12,6 @@ import FieldError from '@/components/ui/field/FieldError.vue'
 import { Input } from '@/components/ui/input'
 import { validateScheme } from '@/validation/validate-scheme'
 import { useFormField } from '@/composables/use-form-field'
-import { parseError } from '@/fetch/parse-error'
 import { useFormFieldValues } from '@/composables/use-form-field-values'
 import Datepicker from '@/components/ui/datepicker/Datepicker.vue'
 import { setFieldErrors } from '@/ui/form/setFieldErrors'
@@ -46,8 +45,8 @@ const onRegisterButtonClick = async () => {
 
   const response = await createUser(formValues.value)
   if (response.error.value != null) {
-    const message = await parseError(response)
-    serverErrorMessage.value = message.message ?? 'Registration failed'
+    serverErrorMessage.value =
+      response.error.value instanceof Error ? response.error.value.message : 'Registration failed'
   }
   isFinished.value = response.isFinished.value
   statusCode.value = response.statusCode.value

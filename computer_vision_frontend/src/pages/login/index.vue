@@ -6,12 +6,9 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import FieldError from '@/components/ui/field/FieldError.vue'
 import { Input } from '@/components/ui/input'
 import { loginScheme } from '@/validation/login-validation'
-import { parseError } from '@/fetch/parse-error'
 import { postAuthentication } from '@/fetch/auth'
-import { getCurrentUser } from '@/fetch/user'
 import { treeifyError } from 'zod'
 import { useTokenStore } from '@/stores/token'
-import { useUserStore } from '@/stores/user'
 
 const email = ref('')
 const password = ref('')
@@ -23,9 +20,9 @@ const passwordError = ref<ErrorType>(null)
 const emailInvalid = computed(() => emailError.value !== null)
 const passwordInvalid = computed(() => passwordError.value !== null)
 
-let serverErrorMessage = ref('')
+const serverErrorMessage = ref('')
 
-let isLoading = ref(false)
+const isLoading = ref(false)
 
 const nullNotEquals = <T,>(oldValue: T, newValue: T, ref: Ref<T | null>): void => {
   if (oldValue !== newValue) {
@@ -58,6 +55,7 @@ const formIsInvalid = () => {
 }
 
 const router = useRouter()
+const route = useRoute('login')
 
 const onLoginButtonClick = async () => {
   const { success, error } = formIsInvalid()
@@ -77,23 +75,26 @@ const onLoginButtonClick = async () => {
     })
     await authFetch.execute()
     if (authFetch.error.value) {
-      const errorMessage = await parseError(authFetch)
-      serverErrorMessage.value = errorMessage.message
+      serverErrorMessage.value =
+        authFetch.error.value instanceof Error
+          ? authFetch.error.value.message
+          : 'An error occurred during login.'
       return
     }
-    const token = authFetch.data.value
+    const token = (authFetch.data.value as { token?: string } | null)?.token
+    if (!token) throw new Error('Authentication response did not contain a token.')
     const tokenStore = useTokenStore()
     tokenStore.setToken(token)
-    const userFetch = getCurrentUser()
-    await userFetch.execute()
-    if (userFetch.error.value) {
-      throw userFetch.error.value
-    }
-    const user = userFetch.data.value
-    const userStore = useUserStore()
-    userStore.setUser(user)
-    router.push('/home')
-  } catch (error) {
+    const requested = route.query.redirect
+    const destination =
+      typeof requested === 'string' &&
+      requested.startsWith('/') &&
+      !requested.startsWith('//') &&
+      !requested.includes('\\')
+        ? requested
+        : '/home'
+    await router.replace(destination)
+  } catch {
     serverErrorMessage.value = 'An error occurred during login.'
   } finally {
     isLoading.value = false
