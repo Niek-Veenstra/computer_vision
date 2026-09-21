@@ -1,9 +1,9 @@
-import Documents from '@/pages/Documents.vue'
-import Exporter from '@/pages/Exporter.vue'
-import Home from '@/pages/Home.vue'
-import Login from '@/pages/Login.vue'
-import Settings from '@/pages/Settings.vue'
-import Signup from '@/pages/Signup.vue'
+import Documents from '@/pages/DocumentsPage.vue'
+import Exporter from '@/pages/ExporterPage.vue'
+import Home from '@/pages/HomePage.vue'
+import Login from '@/pages/LoginPage.vue'
+import Settings from '@/pages/SettingsPage.vue'
+import Signup from '@/pages/SignupPage.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
