@@ -7,7 +7,7 @@ import { ArrowLeftIcon, ScanLineIcon, Trash2Icon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useScannersStore } from '@/stores/scanners'
 
-const route = useRoute()
+const route = useRoute('scanner')
 const router = useRouter()
 const store = useScannersStore()
 const loading = ref(true)
