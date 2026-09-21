@@ -8,18 +8,21 @@ import { UsersController } from './users/users.controller';
 import { AuthController } from './auth/auth.controller';
 import { ConfigModule } from '@nestjs/config';
 import { getDatabaseConfig } from './database.config';
+import { DocumentsModule } from './documents/documents.module';
+import { Document } from './documents/documents.entity';
 
 @Module({
   imports: [
     AuthModule,
     UsersModule,
+    DocumentsModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),
     TypeOrmModule.forRootAsync({
       useFactory: () => ({
         ...getDatabaseConfig(process.env),
-        entities: [User],
+        entities: [User, Document],
       }),
     }),
   ],

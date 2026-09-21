@@ -36,6 +36,25 @@ Copy `.env.example` to `.env` and set the database connection values and
 and the TypeORM data source. `DB_TYPE` currently supports `postgres`.
 The example database credentials match the current `docker-compose.yml`.
 
+## Documents API
+
+Run `npm run db:migrate` after the existing `user` table has been created. This
+creates the `documents` table with a foreign key from `updated_by` to `user.id`.
+The documents endpoints require `Authorization: Bearer <token>` from
+`POST /auth/authenticate`.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/documents` | List documents |
+| `GET` | `/documents/:id` | Get one document |
+| `POST` | `/documents` | Create with `title` and Tiptap `content` |
+| `PATCH` | `/documents/:id` | Update `title` and/or `content`; include the current `version` |
+| `DELETE` | `/documents/:id` | Delete a document |
+
+Documents start at version 1. Each successful `PATCH` increments the version and
+sets `updated_by` to the authenticated user. If the supplied version is stale,
+the API returns `409 Conflict`.
+
 ## Compile and run the project
 
 ```bash
