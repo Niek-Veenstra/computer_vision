@@ -26,6 +26,9 @@ export class User {
   @Column()
   birthDate: string;
 
+  @Column({ name: 'logo_data_url', type: 'text', nullable: true })
+  logoDataUrl: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -9,7 +9,10 @@ export class UsersRepository {
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.repo.findOne({ where: { email } });
+    return this.repo
+      .createQueryBuilder('user')
+      .where('LOWER(user.email) = LOWER(:email)', { email })
+      .getOne();
   }
 
   async findById(id: string): Promise<User | null> {
@@ -18,6 +21,10 @@ export class UsersRepository {
 
   async createUser(userData: Partial<User>): Promise<User> {
     const user = this.repo.create(userData);
+    return this.repo.save(user);
+  }
+
+  async save(user: User): Promise<User> {
     return this.repo.save(user);
   }
 

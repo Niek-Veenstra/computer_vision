@@ -8,6 +8,7 @@ import { CreateUsers1726899999999 } from './database/migrations/1726899999999-Cr
 import { User } from './users/users.entity';
 import { Scanner } from './scanners/scanner.entity';
 import { CreateScanners1790000000001 } from './database/migrations/1790000000001-CreateScanners';
+import { AddUserLogo1790000000002 } from './database/migrations/1790000000002-AddUserLogo';
 
 export const AppDataSource = new DataSource({
   ...getDatabaseConfig(process.env),
@@ -17,5 +18,6 @@ export const AppDataSource = new DataSource({
     CreateDocuments1726900000000,
     AddUserTimestamps1789992000000,
     CreateScanners1790000000001,
+    AddUserLogo1790000000002,
   ],
 });
