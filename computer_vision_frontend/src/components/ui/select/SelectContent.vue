@@ -1,0 +1,36 @@
+<script setup lang="ts">
+import type { SelectContentEmits, SelectContentProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import {
+  SelectContent as RekaSelectContent,
+  SelectPortal,
+  SelectViewport,
+  useForwardPropsEmits,
+} from 'reka-ui'
+import { cn } from '@/lib/utils'
+
+defineOptions({ inheritAttrs: false })
+
+const props = withDefaults(
+  defineProps<SelectContentProps & { class?: HTMLAttributes['class'] }>(),
+  { position: 'popper', sideOffset: 4 },
+)
+const emits = defineEmits<SelectContentEmits>()
+const delegatedProps = reactiveOmit(props, 'class')
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
+</script>
+
+<template>
+  <SelectPortal>
+    <RekaSelectContent
+      data-slot="select-content"
+      v-bind="{ ...$attrs, ...forwarded }"
+      :class="cn('bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-50 max-h-[var(--reka-select-content-available-height)] min-w-[var(--reka-select-trigger-width)] overflow-hidden rounded-md border shadow-md outline-hidden', props.class)"
+    >
+      <SelectViewport class="p-1">
+        <slot />
+      </SelectViewport>
+    </RekaSelectContent>
+  </SelectPortal>
+</template>
