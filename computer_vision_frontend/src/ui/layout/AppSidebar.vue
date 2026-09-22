@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import NavChip from '@/ui/layout/NavChip.vue'
-import Avatar from '@/components/ui/avatar/Avatar.vue'
-import AvatarFallback from '@/components/ui/avatar/AvatarFallback.vue'
-import AvatarImage from '@/components/ui/avatar/AvatarImage.vue'
 import { ActivityIcon, FileIcon, HomeIcon, ScanLineIcon } from 'lucide-vue-next'
 import { getCurrentUser } from '@/fetch/user'
 import { useUserStore } from '@/stores/user'
@@ -21,20 +18,11 @@ import {
   SidebarContent,
   SidebarFooter,
 } from '@/components/ui/sidebar'
-import Settings from './sidebar/SidebarSettings.vue'
+import SidebarUser from './sidebar/SidebarUser.vue'
 type NavChip = InstanceType<typeof NavChip>['$props']
 
 const route = useRoute()
 const userStore = useUserStore()
-const accountName = computed(() => {
-  if (!userStore.user) return 'Account'
-  return `${userStore.user.firstName} ${userStore.user.lastName}`.trim()
-})
-const accountInitials = computed(() => {
-  if (!userStore.user) return 'U'
-  return `${userStore.user.firstName.charAt(0)}${userStore.user.lastName.charAt(0)}`.toUpperCase()
-})
-
 onMounted(async () => {
   if (route.name === 'settings' || userStore.user) return
   const request = getCurrentUser()
@@ -88,27 +76,9 @@ const navChips: NavChip[] = [
     <SidebarFooter class="border-t border-sidebar-border">
       <SidebarMenu>
         <SidebarMenuItem>
-          <Settings />
+          <SidebarUser :user="userStore.user" />
         </SidebarMenuItem>
       </SidebarMenu>
-      <div class="flex items-center gap-3 rounded-md px-2 py-1.5">
-        <Avatar>
-          <AvatarImage
-            v-if="userStore.user?.logoDataUrl"
-            :src="userStore.user.logoDataUrl"
-            alt="Account logo"
-          />
-          <AvatarFallback class="bg-sidebar-accent text-xs font-semibold">
-            {{ accountInitials }}
-          </AvatarFallback>
-        </Avatar>
-        <div class="grid min-w-0 flex-1 text-left leading-tight">
-          <span class="truncate text-sm font-medium">{{ accountName }}</span>
-          <span class="truncate text-xs text-muted-foreground">
-            {{ userStore.user?.email ?? 'Signed in' }}
-          </span>
-        </div>
-      </div>
     </SidebarFooter>
   </Sidebar>
 </template>

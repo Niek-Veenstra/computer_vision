@@ -5,6 +5,9 @@ import router from './router'
 import './ui/style/App.css'
 import 'primeicons/primeicons.css'
 import { useTokenStore } from './stores/token'
+import { saveThemeService } from './services/save-theme'
+
+document.documentElement.classList.toggle('dark', saveThemeService.getTheme() === 'dark')
 
 const app = createApp(App)
 
