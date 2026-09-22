@@ -5,64 +5,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import FieldError from '@/components/ui/field/FieldError.vue'
 import { Input } from '@/components/ui/input'
+import { useFormField } from '@/composables/use-form-field'
+import { useFormFieldValues } from '@/composables/use-form-field-values'
 import { loginScheme } from '@/validation/login-validation'
+import { validateScheme } from '@/validation/validate-scheme'
 import { postAuthentication } from '@/fetch/auth'
-import { treeifyError } from 'zod'
 import { useTokenStore } from '@/stores/token'
+import { setFieldErrors } from '@/ui/form/setFieldErrors'
 
-const email = ref('')
-const password = ref('')
-
-type ErrorType = string | null
-const emailError = ref<ErrorType>(null)
-const passwordError = ref<ErrorType>(null)
-
-const emailInvalid = computed(() => emailError.value !== null)
-const passwordInvalid = computed(() => passwordError.value !== null)
+const fields = {
+  email: useFormField(''),
+  password: useFormField(''),
+}
+const formValues = useFormFieldValues(fields)
 
 const serverErrorMessage = ref('')
 
 const isLoading = ref(false)
-
-const setRefValueNullWhenNotEquals = <T,>(oldValue: T, newValue: T, ref: Ref<T | null>): void => {
-  if (oldValue !== newValue) {
-    ref.value = null
-  }
-}
-
-watch(email, (oldEmail, newEmail) => {
-  setRefValueNullWhenNotEquals(oldEmail, newEmail, emailError)
-})
-watch(password, (oldPassword, newPassword) => {
-  setRefValueNullWhenNotEquals(oldPassword, newPassword, passwordError)
-})
-
-const formIsInvalid = () => {
-  const result = loginScheme.safeParse({
-    email: email.value,
-    password: password.value,
-  })
-  if (!result.success) {
-    return {
-      success: false,
-      error: treeifyError(result.error),
-    } as const
-  }
-  return {
-    success: true,
-    error: null,
-  } as const
-}
 
 const router = useRouter()
 const route = useRoute('login')
 
 const onLoginButtonClick = async () => {
   if (isLoading.value) return
-  const { success, error } = formIsInvalid()
-  if (!success) {
-    emailError.value = error.properties?.email?.errors.join(', ') ?? null
-    passwordError.value = error.properties?.password?.errors.join(', ') ?? null
+  const validation = validateScheme(formValues.value, loginScheme)
+  if (!validation.success) {
+    const errors = Object.fromEntries(
+      Object.entries(validation.error.properties ?? {}).map(([key, value]) => [
+        key,
+        value.errors.join(', '),
+      ]),
+    )
+    setFieldErrors(fields, errors)
     return
   }
 
@@ -70,10 +44,7 @@ const onLoginButtonClick = async () => {
   serverErrorMessage.value = ''
 
   try {
-    const authFetch = postAuthentication({
-      email: email.value,
-      password: password.value,
-    })
+    const authFetch = postAuthentication(validation.data)
     await authFetch.execute()
     if (authFetch.error.value) {
       serverErrorMessage.value =
@@ -116,22 +87,21 @@ const onLoginButtonClick = async () => {
             <CardDescription> Login with your account </CardDescription>
           </CardHeader>
           <CardContent>
-            <form>
+            <form novalidate @submit.prevent="onLoginButtonClick">
               <FieldGroup>
-                <Field :data-invalid="emailInvalid">
+                <Field :data-invalid="fields.email.invalid.value">
                   <FieldLabel htmlFor="email">Email</FieldLabel>
                   <Input
-                    :v-model="email"
-                    @update:modelValue="(value) => (email = value as string)"
+                    v-model="fields.email.formValue.value"
                     id="email"
                     type="email"
                     placeholder="m@example.com"
                     required
-                    :aria-invalid="emailInvalid"
+                    :aria-invalid="fields.email.invalid.value"
                   ></Input>
-                  <FieldDescription> {{ emailError }} </FieldDescription>
+                  <FieldDescription> {{ fields.email.error }} </FieldDescription>
                 </Field>
-                <Field :data-invalid="passwordInvalid">
+                <Field :data-invalid="fields.password.invalid.value">
                   <div class="flex items-center">
                     <FieldLabel for="password"> Password </FieldLabel>
                     <a
@@ -143,21 +113,20 @@ const onLoginButtonClick = async () => {
                   </div>
                   <span class="flex gap-3 flex-col">
                     <Input
-                      :v-model="password"
-                      @update:modelValue="(value) => (password = value as string)"
+                      v-model="fields.password.formValue.value"
                       id="password"
                       type="password"
                       required
-                      :aria-invalid="passwordInvalid"
+                      :aria-invalid="fields.password.invalid.value"
                     />
-                    <FieldDescription> {{ passwordError }} </FieldDescription>
+                    <FieldDescription> {{ fields.password.error }} </FieldDescription>
                   </span>
                 </Field>
                 <FieldError v-if="serverErrorMessage">
                   {{ serverErrorMessage }}
                 </FieldError>
                 <Field>
-                  <Button type="button" @click="onLoginButtonClick" :disabled="isLoading">
+                  <Button type="submit" :disabled="isLoading">
                     {{ isLoading ? 'Logging in...' : 'Login' }}
                   </Button>
                   <FieldDescription class="text-center">

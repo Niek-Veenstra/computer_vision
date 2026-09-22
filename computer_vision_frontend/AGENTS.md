@@ -37,6 +37,13 @@
 - Documents are stored only through the backend API; do not add browser local storage for documents or legacy document imports.
 - Keep persistence in the store/service layer rather than individual components. Do not silently discard saved content on load or save errors.
 
+## Forms and validation
+
+- For submitted data forms, define fields with `useFormField` and derive their values with `useFormFieldValues`.
+- Keep each form's Zod schema in a feature-specific `src/validation/<feature>-validation.ts` file. Validate submitted values with `validateScheme`, show field errors with `setFieldErrors`, and send the validated data to the API.
+- Match frontend rules such as required fields and length limits to the backend API contract.
+- Search and filter inputs, read-only fields, confirmation actions and the autosaving document editor do not need a form schema unless they become submitted data forms.
+
 ## Verification and workflow
 
 - Do not run frontend tests, builds, typechecks or validation commands other than direct ESLint checks. The user performs those checks.

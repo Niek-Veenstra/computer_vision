@@ -73,7 +73,7 @@ const onRegisterButtonClick = async () => {
           </CardHeader>
 
           <CardContent>
-            <form>
+            <form novalidate @submit.prevent="onRegisterButtonClick">
               <FieldGroup class="gap-2">
                 <Field :data-invalid="fields.firstName.invalid.value">
                   <FieldLabel htmlFor="name">First Name</FieldLabel>
@@ -83,7 +83,7 @@ const onRegisterButtonClick = async () => {
                     type="text"
                     placeholder="Enter your first name"
                     required
-                    :aria-invalid="fields.firstName.invalid"
+                    :aria-invalid="fields.firstName.invalid.value"
                   />
                   <FieldDescription>{{ fields.firstName.error }}</FieldDescription>
                 </Field>
@@ -152,7 +152,7 @@ const onRegisterButtonClick = async () => {
                 </FieldError>
 
                 <Field>
-                  <Button type="button" @click="onRegisterButtonClick"> Create Account </Button>
+                  <Button type="submit"> Create Account </Button>
 
                   <FieldDescription class="text-center">
                     Already have an account?
