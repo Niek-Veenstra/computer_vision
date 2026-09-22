@@ -1,7 +1,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'ScannersPage' })
 
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   BanIcon,
   CopyIcon,
@@ -13,23 +13,49 @@ import {
   XIcon,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useFormField } from '@/composables/use-form-field'
+import { useFormFieldValues } from '@/composables/use-form-field-values'
 import { useScannersStore } from '@/stores/scanners'
+import { setFieldErrors } from '@/ui/form/setFieldErrors'
+import { createScannerScheme } from '@/validation/scanner-validation'
+import { validateScheme } from '@/validation/validate-scheme'
 
 type Action = { id: string; kind: 'rotate' | 'revoke' }
 
 const store = useScannersStore()
 const search = ref('')
 const showCreate = ref(false)
-const newName = ref('')
+const fields = { name: useFormField('') }
+const formValues = useFormFieldValues(fields)
 const confirmation = ref<Action | null>(null)
 const revealedKey = ref<{ scannerName: string; apiKey: string } | null>(null)
 const copied = ref(false)
 const copyError = ref('')
+const confirmationOpen = computed({
+  get: () => confirmation.value !== null,
+  set: (open: boolean) => {
+    if (!open && !store.busyId) confirmation.value = null
+  },
+})
+const keyDialogOpen = computed({
+  get: () => revealedKey.value !== null,
+  set: (open: boolean) => {
+    if (!open) dismissKey()
+  },
+})
 
 onMounted(() => void store.load())
 onBeforeUnmount(() => {
-  revealedKey.value = null
+  dismissKey()
 })
 
 const filteredScanners = computed(() => {
@@ -61,6 +87,19 @@ function dismissKey() {
   copyError.value = ''
 }
 
+function preventDismiss(event: Event) {
+  event.preventDefault()
+}
+
+function keepConfirmationOpenWhileBusy(event: Event) {
+  if (store.busyId) event.preventDefault()
+}
+
+function openConfirmation(action: Action) {
+  store.actionErrors[action.id] = ''
+  confirmation.value = action
+}
+
 async function copyKey() {
   if (!revealedKey.value) return
   try {
@@ -73,11 +112,22 @@ async function copyKey() {
 }
 
 async function addScanner() {
-  if (revealedKey.value || !newName.value.trim()) return
-  const result = await store.create(newName.value)
+  if (revealedKey.value || store.creating) return
+  const validation = validateScheme(formValues.value, createScannerScheme)
+  if (!validation.success) {
+    const errors = Object.fromEntries(
+      Object.entries(validation.error.properties ?? {}).map(([key, value]) => [
+        key,
+        value.errors.join(', '),
+      ]),
+    )
+    setFieldErrors(fields, errors)
+    return
+  }
+  const result = await store.create(validation.data.name)
   if (!result) return
   showKey(result.scanner.name, result.apiKey)
-  newName.value = ''
+  fields.name.formValue.value = ''
   showCreate.value = false
 }
 
@@ -87,8 +137,9 @@ async function confirmAction() {
   if (action.kind === 'rotate') {
     const result = await store.rotateKey(action.id)
     if (result) {
-      showKey(result.scanner.name, result.apiKey)
       confirmation.value = null
+      await nextTick()
+      showKey(result.scanner.name, result.apiKey)
     }
     return
   }
@@ -123,16 +174,21 @@ async function confirmAction() {
       <p class="mt-1 text-sm text-muted-foreground">
         Give this device a name you will recognize.
       </p>
-      <form class="mt-4 flex flex-col gap-3 sm:flex-row" @submit.prevent="addScanner">
-        <Input
-          v-model="newName"
-          aria-label="Scanner name"
-          placeholder="e.g. Home math scanner"
-          maxlength="100"
-          class="sm:max-w-sm"
-        />
+      <form class="mt-4 flex flex-col gap-3 sm:flex-row" novalidate @submit.prevent="addScanner">
+        <div class="w-full sm:max-w-sm">
+          <Input
+            v-model="fields.name.formValue.value"
+            aria-label="Scanner name"
+            placeholder="e.g. Home math scanner"
+            maxlength="100"
+            :aria-invalid="fields.name.invalid.value"
+          />
+          <p v-if="fields.name.error.value" class="mt-2 text-sm text-destructive" role="alert">
+            {{ fields.name.error.value }}
+          </p>
+        </div>
         <div class="flex gap-2">
-          <Button type="submit" :disabled="store.creating || !newName.trim()">
+          <Button type="submit" :disabled="store.creating">
             {{ store.creating ? 'Adding…' : 'Create scanner' }}
           </Button>
           <Button type="button" variant="outline" @click="showCreate = false">Cancel</Button>
@@ -143,39 +199,84 @@ async function confirmAction() {
       </p>
     </div>
 
-    <div v-if="revealedKey" class="rounded-xl border border-primary/30 bg-primary/5 p-5">
-      <div class="flex items-start gap-3">
-        <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background">
-          <KeyRoundIcon class="size-5" aria-hidden="true" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <h2 class="font-semibold">API key for {{ revealedKey.scannerName }}</h2>
-          <p class="mt-1 text-sm text-muted-foreground">
-            Save this key on your scanner now. It will not be shown again.
-          </p>
-          <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+    <Dialog v-model:open="keyDialogOpen">
+      <DialogContent
+        :show-close-button="false"
+        @escape-key-down="preventDismiss"
+        @interact-outside="preventDismiss"
+      >
+        <template v-if="revealedKey">
+          <DialogHeader>
+            <span class="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <KeyRoundIcon class="size-5" aria-hidden="true" />
+            </span>
+            <DialogTitle>API key for {{ revealedKey.scannerName }}</DialogTitle>
+            <DialogDescription>
+              Save this key on your scanner now. It will not be shown again.
+            </DialogDescription>
+          </DialogHeader>
+          <div class="flex min-w-0 flex-col gap-2 sm:flex-row">
             <Input
               :model-value="revealedKey.apiKey"
               aria-label="New scanner API key"
               readonly
               autocomplete="off"
               :spellcheck="false"
-              class="font-mono sm:flex-1"
+              class="min-w-0 flex-1 font-mono"
             />
             <Button variant="outline" @click="copyKey">
               <CopyIcon aria-hidden="true" />{{ copied ? 'Copied' : 'Copy key' }}
             </Button>
           </div>
-          <p class="mt-2 text-xs text-muted-foreground">
+          <p class="text-xs text-muted-foreground">
             Send it in the X-Scanner-Key header when the device calls the backend.
           </p>
-          <p v-if="copyError" class="mt-2 text-sm text-destructive" role="alert">
+          <p v-if="copyError" class="text-sm text-destructive" role="alert">
             {{ copyError }}
           </p>
-          <Button class="mt-4" variant="secondary" @click="dismissKey">I saved the key</Button>
-        </div>
-      </div>
-    </div>
+          <DialogFooter>
+            <Button @click="dismissKey">I saved the key</Button>
+          </DialogFooter>
+        </template>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="confirmationOpen">
+      <DialogContent
+        :show-close-button="!store.busyId"
+        @escape-key-down="keepConfirmationOpenWhileBusy"
+        @interact-outside="keepConfirmationOpenWhileBusy"
+      >
+        <template v-if="confirmation">
+          <DialogHeader>
+            <DialogTitle>
+              {{ confirmation.kind === 'rotate' ? 'Rotate scanner key?' : 'Revoke scanner?' }}
+            </DialogTitle>
+            <DialogDescription v-if="confirmation.kind === 'rotate'">
+              The current key will stop working immediately. Save the new key when it appears.
+            </DialogDescription>
+            <DialogDescription v-else>
+              This scanner will no longer be able to connect.
+            </DialogDescription>
+          </DialogHeader>
+          <p v-if="store.actionErrors[confirmation.id]" class="text-sm text-destructive" role="alert">
+            {{ store.actionErrors[confirmation.id] }}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" :disabled="!!store.busyId" @click="confirmation = null">
+              Cancel
+            </Button>
+            <Button
+              :variant="confirmation.kind === 'revoke' ? 'destructive' : 'default'"
+              :disabled="!!store.busyId"
+              @click="confirmAction"
+            >
+              {{ store.busyId === confirmation.id ? 'Working…' : 'Confirm' }}
+            </Button>
+          </DialogFooter>
+        </template>
+      </DialogContent>
+    </Dialog>
 
     <div
       v-if="store.loadError"
@@ -254,36 +355,13 @@ async function confirmAction() {
           </div>
         </dl>
 
-        <p v-if="store.actionErrors[scanner.id]" class="mt-4 text-sm text-destructive" role="alert">
-          {{ store.actionErrors[scanner.id] }}
-        </p>
         <div v-if="!scanner.revokedAt" class="relative z-10 mt-5 border-t pt-4">
-          <div v-if="confirmation?.id === scanner.id" class="space-y-3">
-            <p class="text-sm">
-              {{
-                confirmation?.kind === 'rotate'
-                  ? 'The current key will stop working immediately. Rotate it?'
-                  : 'This scanner will no longer be able to connect. Revoke it?'
-              }}
-            </p>
-            <div class="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                :variant="confirmation?.kind === 'revoke' ? 'destructive' : 'default'"
-                :disabled="!!store.busyId"
-                @click="confirmAction"
-              >
-                {{ store.busyId === scanner.id ? 'Working…' : 'Confirm' }}
-              </Button>
-              <Button size="sm" variant="outline" @click="confirmation = null">Cancel</Button>
-            </div>
-          </div>
-          <div v-else class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
               :disabled="!!store.busyId || !!revealedKey"
-              @click="confirmation = { id: scanner.id, kind: 'rotate' }"
+              @click="openConfirmation({ id: scanner.id, kind: 'rotate' })"
             >
               <RotateCwIcon aria-hidden="true" />Rotate key
             </Button>
@@ -291,7 +369,7 @@ async function confirmAction() {
               variant="ghost"
               size="sm"
               :disabled="!!store.busyId || !!revealedKey"
-              @click="confirmation = { id: scanner.id, kind: 'revoke' }"
+              @click="openConfirmation({ id: scanner.id, kind: 'revoke' })"
             >
               <BanIcon aria-hidden="true" />Revoke
             </Button>
