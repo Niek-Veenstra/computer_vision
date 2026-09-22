@@ -55,13 +55,6 @@ declare module 'vue-router/auto-routes' {
       { documentId: ParamValue<false> },
       | never
     >,
-    'exporter': RouteRecordInfo<
-      'exporter',
-      '/exporter',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     'home': RouteRecordInfo<
       'home',
       '/home',
@@ -148,12 +141,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/documents/[documentId].vue': {
       routes:
         | 'document'
-      views:
-        | never
-    }
-    'src/pages/exporter/index.vue': {
-      routes:
-        | 'exporter'
       views:
         | never
     }

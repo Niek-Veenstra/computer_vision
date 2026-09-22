@@ -5,7 +5,7 @@ import NavChip from '@/ui/layout/NavChip.vue'
 import Avatar from '@/components/ui/avatar/Avatar.vue'
 import AvatarFallback from '@/components/ui/avatar/AvatarFallback.vue'
 import AvatarImage from '@/components/ui/avatar/AvatarImage.vue'
-import { ArrowRightFromLineIcon, FileIcon, HomeIcon, ScanLineIcon } from 'lucide-vue-next'
+import { FileIcon, HomeIcon, ScanLineIcon } from 'lucide-vue-next'
 import { getCurrentUser } from '@/fetch/user'
 import { useUserStore } from '@/stores/user'
 
@@ -46,7 +46,6 @@ const navChips: NavChip[] = [
   { icon: HomeIcon, label: 'Home', tooltip: 'Home', to: '/home' },
   { icon: FileIcon, label: 'Documents', tooltip: 'Documents', to: '/documents' },
   { icon: ScanLineIcon, label: 'Scanners', tooltip: 'Scanners', to: '/scanners' },
-  { icon: ArrowRightFromLineIcon, label: 'Exporter', tooltip: 'Exporter', to: '/exporter' },
 ]
 </script>
 <template>
