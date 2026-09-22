@@ -5,8 +5,6 @@ def get_dataset(dir, size, batch_size=32):
         f"{dir}/train",
         image_size=size,
         batch_size=batch_size,
-        validation_split=0.2,
-        subset="training",
         seed=42,
         label_mode="int",
     )
@@ -15,10 +13,9 @@ def get_dataset(dir, size, batch_size=32):
         f"{dir}/val",
         image_size=size,
         batch_size=batch_size,
-        validation_split=0.2,
-        subset="validation",
-        seed=42,
+        class_names=train_ds.class_names,
         label_mode="int",
+        shuffle=False,
     )
     return train_ds, val_ds
 
