@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { useUserStore } from '@/stores/user'
 
 export const useTokenStore = defineStore('token', {
   state: () => ({
@@ -6,6 +7,7 @@ export const useTokenStore = defineStore('token', {
   }),
   actions: {
     setToken(token: string | null) {
+      if (this.token !== token) useUserStore().setUser(null)
       this.token = token
       if (token) {
         localStorage.setItem('token', token)
