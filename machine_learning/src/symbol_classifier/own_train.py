@@ -2,8 +2,8 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import json
 from tensorflow import keras
-import own_model
-from own_model.dataset import get_dataset
+import symbol_classifier
+from symbol_classifier.dataset import get_dataset
 
 TARGET_SIZE = (128, 128)
 BATCH_SIZE = 32
@@ -30,7 +30,7 @@ def main():
     with open("class_mapping.json", "w") as f:
         json.dump(train_set.class_names, f, indent=2)
 
-    model = own_model.build_cnn(num_classes=NUM_CLASSES)
+    model = symbol_classifier.build_cnn(num_classes=NUM_CLASSES)
 
     class_weights, counts = compute_class_weights(train_set, NUM_CLASSES)
     print("Class counts:", counts)

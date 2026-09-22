@@ -5,6 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "myapp"
 version = "0.0.1"
+dependencies = [
+    "torch>=2.1.0",
+    "torchvision>=0.16.0",
+    "ultralytics>=8.0.148",
+    "tensorflow>=2.20.0; sys_platform == 'win32'",
+    "tensorflow[and-cuda]>=2.20.0; sys_platform != 'win32'",
+    "opencv-python>=4.8.1",
+    "numpy>=1.25.0",
+    "Pillow>=10.0.0",
+    "matplotlib",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
