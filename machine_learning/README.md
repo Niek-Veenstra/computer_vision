@@ -57,18 +57,28 @@ Hiervoor is een grafische omgeving nodig. De afbeelding en het modelpad zijn in 
 
 ## Eigen CNN-classifier
 
-`src/dataset/util/crop_from_labelstudio.py` zet de YOLO-annotaties in `symbols_and_operators/` om naar losse afbeeldingen in `new_symbols_operators_dataset/class_<index>/`. **Let op:** het script verwijdert die uitvoermap eerst als die al bestaat.
+`src/dataset/util/prepare_classifier_dataset.py` maakt eerst uitsneden uit beide afbeeldingen en hun annotaties in `symbols_and_operators/images/` en `symbols_and_operators/labels/`. Daarna verdeelt het de uitsneden per klasse met een vaste seed in 80% training en 20% validatie. De uitvoer staat in `symbols_and_operators/classifier/train/class_<index>/` en `symbols_and_operators/classifier/val/class_<index>/`. De originele YOLO-bestanden blijven intact. De gegenereerde map staat niet in Git. Het voorbereidingsscript stopt als de uitvoermap al bestaat, zodat bestaande uitsneden niet worden overschreven.
 
-Voor training verwacht `src/symbol_classifier/own_train.py` een aparte map `symbols_operators/` met daaronder `train/class_0/` tot en met `train/class_14/` en dezelfde klassemappen onder `val/`. Die map staat momenteel niet in de repository; de uitsneden moeten dus nog over deze mappen worden verdeeld. De datalader gebruikt in beide mappen nog een `validation_split` van 20%, waardoor niet alle bestanden uit `train/` en `val/` in een training terechtkomen.
+```powershell
+python src/dataset/util/prepare_classifier_dataset.py
+```
+
+De huidige annotaties leveren 808 trainingsuitsneden en 202 validatie-uitsneden op. Alle 15 klassen hebben voorbeelden in beide sets. Uitsneden uit dezelfde bronafbeelding kunnen wel in beide sets terechtkomen; validatiescores meten daardoor niet betrouwbaar hoe het model op volledig nieuwe bronafbeeldingen presteert. Het oudere script `src/dataset/util/crop_from_labelstudio.py` maakt een andere, ongesplitste map (`new_symbols_operators_dataset/`) voor de analysescripts. **Let op:** dat script verwijdert zijn uitvoermap eerst als die al bestaat.
 
 Het CNN gebruikt RGB-afbeeldingen van 128 × 128 pixels, batchgrootte 32 en maximaal 25 epochs. Het berekent klassegewichten en gebruikt early stopping, een checkpoint en een lagere leersnelheid bij stagnerende validatie. De scripts schakelen CUDA voor dit model uit.
 
-Wanneer de verwachte datamap aanwezig is, start de training met:
+Wanneer de datamap aanwezig is, start de training met:
 
 ```powershell
 python -m symbol_classifier.own_train
 ```
 
-Dit schrijft `class_mapping.json`, `symbol_classifier.keras` (beste checkpoint) en `symbol_classifier_final.keras`. De `.keras`-bestanden staan momenteel niet in de repository. Evaluatie met `python -m symbol_classifier.assess` en inferentie met `python -m symbol_classifier.own_inference` vereisen `symbol_classifier_final.keras`. De inferentiedemo gebruikt bovendien een vast afbeeldingspad onder `new_symbols_operators_dataset/`; pas dat pad aan voor je eigen afbeelding. Evaluatie schrijft `confusion_matrix.png` en toont een grafiek.
+Dit schrijft `class_mapping.json`, `symbol_classifier.keras` (beste checkpoint) en `symbol_classifier_final.keras`. De `.keras`-bestanden worden lokaal opgeslagen en door Git genegeerd. Voor inferentie geef je een uitsnede als argument mee:
+
+```powershell
+python -m symbol_classifier.own_inference symbols_and_operators/classifier/val/class_5/b4b8af9d-IMG_2129_101.png
+```
+
+Evaluatie met `python -m symbol_classifier.assess` vereist ook `symbol_classifier_final.keras`. Het script schrijft `confusion_matrix.png` en toont een grafiek.
 
 De scripts `src/dataset/analysis/` analyseren klasseverdeling, exacte dubbele bestanden, afbeeldingsgroottes en beeldverhoudingen in `new_symbols_operators_dataset/`.
