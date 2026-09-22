@@ -23,7 +23,7 @@ def compute_class_weights(train_ds, num_classes: int):
 
 def main():
     train_set, validation_set = get_dataset(
-        "symbols_operators",
+        "symbols_and_operators/classifier",
         TARGET_SIZE,
         batch_size=BATCH_SIZE,        
     )
@@ -61,6 +61,7 @@ def main():
         epochs=EPOCHS,
         class_weight=class_weights,
         callbacks=callbacks,
+        verbose=2,
     )
 
     model.save("symbol_classifier_final.keras")

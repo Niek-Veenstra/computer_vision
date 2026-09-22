@@ -8,4 +8,7 @@ bin
 __pycache__
 .venv/
 *.egg-info/
+symbols_and_operators/classifier/
+symbol_classifier.keras
+symbol_classifier_final.keras
 

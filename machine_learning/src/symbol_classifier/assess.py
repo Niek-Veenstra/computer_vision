@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from keras.utils import image_dataset_from_directory
 from keras.models import Model
 
-DATA_DIR = "symbols_operators"
+DATA_DIR = "symbols_and_operators/classifier"
 MODEL_PATH = "symbol_classifier_final.keras"
 IMG_SIZE = (128, 128)
 BATCH_SIZE = 32
