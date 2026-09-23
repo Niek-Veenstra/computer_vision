@@ -89,9 +89,9 @@ Het Streamlit-dashboard evalueert een geselecteerd model en toont accuracy, bala
 python -m streamlit run src/symbol_classifier/dashboard.py
 ```
 
-In de tab **Model trainen** kies je `build_cnn()` (CNN v1) of `build_cnn_v2()` (CNN v2), het maximale aantal epochs, de seed, de batchgrootte en de learning rate. De standaard learning rate is `0.001`. De gekozen waarde initialiseert de Adam-optimizer en wordt in de metadata en status van de run opgeslagen. De training draait als een apart lokaal Python-proces, zodat het dashboard bruikbaar blijft. Met **Status vernieuwen** zie je de actuele epoch, validatie-accuracy en trainingslog. Na voltooiing verschijnt de run in de modelselector bovenaan.
+In de tab **Model trainen** kies je `build_cnn()` (CNN v1) of `build_cnn_v2()` (CNN v2), het maximale aantal epochs, de seed, de batchgrootte en de learning rate. De standaard learning rate is `0.001`. De gekozen waarde initialiseert de Adam-optimizer en wordt in de metadata en status van de run opgeslagen. De training draait als een apart lokaal Python-proces, zodat het dashboard bruikbaar blijft. Met **Status vernieuwen** zie je de actuele epoch, validatie-accuracy en trainingslog. Een actieve dashboardtraining kan na bevestiging met **Stop training** direct worden beëindigd. Reeds geschreven checkpoints, historie en logs blijven dan in de runmap staan en de status wordt `stopped`. Na een normaal voltooide training verschijnt de run in de modelselector bovenaan.
 
-Onder in dezelfde tab kun je een voltooide dashboardrun verwijderen. Dit verwijdert de volledige gekozen runmap met de gecompileerde modellen, metrics, historie en TensorBoard-data. De functies `build_cnn()` en `build_cnn_v2()` blijven in de broncode staan. De bestaande baseline `symbol_classifier_final.keras` is niet verwijderbaar vanuit het dashboard.
+Onder in dezelfde tab kun je met een multiselect één of meerdere voltooide dashboardruns tegelijk verwijderen. Dit verwijdert de volledige gekozen runmappen met de gecompileerde modellen, metrics, historie en TensorBoard-data. De functies `build_cnn()` en `build_cnn_v2()` blijven in de broncode staan. De bestaande baseline `symbol_classifier_final.keras` is niet verwijderbaar vanuit het dashboard.
 
 Iedere dashboardtraining krijgt een eigen map onder `runs/models/<architectuur>/<tijdstip>/` met:
 

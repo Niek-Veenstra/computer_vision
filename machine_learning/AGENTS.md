@@ -10,6 +10,7 @@
 - Dashboard-started model runs are isolated under `runs/models/<architecture>/<run-id>/` and never replace the baseline file.
 - The dashboard model selector controls metrics, confusion matrices, error examples and inference together. Always report the selected architecture and run when discussing dashboard results.
 - Dashboard training records the selected learning rate in run metadata and status. Adam uses that value as its initial learning rate before `ReduceLROnPlateau` can lower it.
+- Dashboard-started training stores its process ID in `status.json`. The dashboard may terminate only runs with a `starting` or `running` status below `runs/models/`, after which it records `stopped` while retaining partial artifacts.
 - The dashboard may delete only a selected run directory whose resolved path is exactly two levels below `runs/models/`. Keep the baseline model and registered architecture functions protected.
 
 ## Recorded confusion issue

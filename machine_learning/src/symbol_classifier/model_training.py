@@ -140,6 +140,7 @@ def train_model(
         "seed": seed,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
+        "process_id": os.getpid(),
         "started_at": started_at,
     }
     write_json(

@@ -1,11 +1,14 @@
 """Interactive validation dashboard for the symbol classifier."""
 
 import csv
+import ctypes
 import json
 import os
+import signal
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -43,6 +46,12 @@ def read_json(path: Path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
+
+
+def write_json(path: Path, value: dict) -> None:
+    temporary_path = path.with_suffix(path.suffix + ".tmp")
+    temporary_path.write_text(json.dumps(value, indent=2), encoding="utf-8")
+    temporary_path.replace(path)
 
 
 def available_trained_models() -> dict[str, dict]:
@@ -151,6 +160,83 @@ def training_status_rows(statuses: list[tuple[Path, dict]]) -> list[dict]:
     return rows
 
 
+def process_is_running(process_id: int) -> bool:
+    if os.name == "nt":
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        open_process = kernel32.OpenProcess
+        open_process.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        open_process.restype = ctypes.c_void_p
+        get_exit_code = kernel32.GetExitCodeProcess
+        get_exit_code.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+        get_exit_code.restype = ctypes.c_int
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [ctypes.c_void_p]
+        close_handle.restype = ctypes.c_int
+        handle = open_process(0x1000, False, process_id)
+        if not handle:
+            return ctypes.get_last_error() == 5
+        try:
+            exit_code = ctypes.c_ulong()
+            if not get_exit_code(handle, ctypes.byref(exit_code)):
+                return True
+            return exit_code.value == 259
+        finally:
+            close_handle(handle)
+    try:
+        os.kill(process_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def stop_training_process(status_path: Path) -> dict:
+    resolved_status_path = status_path.resolve()
+    model_runs_root = MODEL_RUNS_DIR.resolve()
+    run_dir = resolved_status_path.parent
+    if (
+        resolved_status_path.name != "status.json"
+        or run_dir.parent.parent != model_runs_root
+        or not run_dir.is_relative_to(model_runs_root)
+    ):
+        raise ValueError(f"Refusing to stop training outside {model_runs_root}")
+
+    status = read_json(resolved_status_path)
+    if status.get("state") not in {"starting", "running"}:
+        raise ValueError("Deze training is niet meer actief.")
+    process_id = status.get("process_id")
+    if not isinstance(process_id, int) or process_id < 1:
+        raise ValueError("Deze run bevat geen geldig proces-ID en kan niet worden gestopt.")
+
+    try:
+        os.kill(process_id, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    except OSError as error:
+        latest_status = read_json(resolved_status_path)
+        if latest_status.get("state") in {"completed", "failed", "stopped"}:
+            return latest_status
+        raise RuntimeError(f"Proces {process_id} kon niet worden gestopt: {error}") from error
+
+    for _ in range(20):
+        if not process_is_running(process_id):
+            break
+        time.sleep(0.1)
+    if process_is_running(process_id):
+        raise RuntimeError(f"Proces {process_id} draait nog na het stopsignaal.")
+
+    stopped_at = datetime.now().isoformat(timespec="seconds")
+    stopped_status = {
+        **status,
+        "state": "stopped",
+        "stopped_at": stopped_at,
+        "updated_at": stopped_at,
+    }
+    write_json(resolved_status_path, stopped_status)
+    return stopped_status
+
+
 def delete_model_run(model_record: dict) -> Path:
     model_path = Path(model_record["path"]).resolve()
     model_runs_root = MODEL_RUNS_DIR.resolve()
@@ -167,6 +253,10 @@ def delete_model_run(model_record: dict) -> Path:
     if log_path.is_file():
         log_path.unlink()
     return run_dir
+
+
+def delete_model_runs(model_records: list[dict]) -> list[Path]:
+    return [delete_model_run(model_record) for model_record in model_records]
 
 
 def dataset_signature(directory: Path) -> tuple[tuple[str, int], ...]:
@@ -422,6 +512,9 @@ def main() -> None:
     deleted_message = st.session_state.pop("model_deleted_message", None)
     if deleted_message:
         st.success(deleted_message)
+    stopped_message = st.session_state.pop("training_stopped_message", None)
+    if stopped_message:
+        st.warning(stopped_message)
     selected_model_key = st.selectbox(
         "Model voor resultaten en inference",
         tuple(trained_models),
@@ -741,6 +834,44 @@ def main() -> None:
         else:
             st.info("Er zijn nog geen modeltrainingen vanuit het dashboard gestart.")
 
+        active_statuses = [
+            (status_path, status)
+            for status_path, status in statuses
+            if status.get("state") in {"starting", "running"}
+            and isinstance(status.get("process_id"), int)
+        ]
+        if active_statuses:
+            st.divider()
+            st.subheader("Actieve training stoppen")
+            active_status_path = st.selectbox(
+                "Actieve run",
+                tuple(status_path for status_path, _ in active_statuses),
+                format_func=lambda path: (
+                    f"{read_json(path).get('model_label', '?')} — "
+                    f"{read_json(path).get('run_id', path.parent.name)}"
+                ),
+                key="training_run_to_stop",
+            )
+            active_status = read_json(active_status_path)
+            st.caption(
+                "De training wordt direct beëindigd. Reeds geschreven checkpoints, "
+                "trainingshistorie en logs blijven in de runmap staan."
+            )
+            confirm_stop = st.checkbox(
+                f"Stop run {active_status.get('run_id', active_status_path.parent.name)}",
+                key="confirm_training_stop",
+            )
+            if st.button(
+                "Stop training",
+                type="primary",
+                disabled=not confirm_stop,
+            ):
+                stopped_status = stop_training_process(active_status_path)
+                st.session_state["training_stopped_message"] = (
+                    f"Training gestopt: {stopped_status.get('run_id', active_status_path.parent.name)}"
+                )
+                st.rerun()
+
         st.divider()
         st.subheader("Getrainde modelrun verwijderen")
         deletable_models = {
@@ -749,30 +880,33 @@ def main() -> None:
             if key != "baseline"
         }
         if deletable_models:
-            deletion_key = st.selectbox(
-                "Modelrun",
+            deletion_keys = st.multiselect(
+                "Modelruns",
                 tuple(deletable_models),
                 format_func=lambda key: deletable_models[key]["label"],
-                key="model_run_to_delete",
+                key="model_runs_to_delete",
             )
-            deletion_model = deletable_models[deletion_key]
             st.caption(
                 "Hiermee verwijder je de opgeslagen weights, metrics, historie en "
-                "TensorBoard-data van deze run. De architectuurcode blijft bestaan."
+                "TensorBoard-data van de geselecteerde runs. De architectuurcode blijft bestaan."
             )
             confirm_deletion = st.checkbox(
-                f"Verwijder {deletion_model['label']} definitief"
+                f"Verwijder {len(deletion_keys)} geselecteerde modelrun(s) definitief",
+                disabled=not deletion_keys,
             )
             if st.button(
-                "Verwijder modelrun",
+                "Verwijder geselecteerde modelruns",
                 type="primary",
-                disabled=not confirm_deletion,
+                disabled=not deletion_keys or not confirm_deletion,
             ):
-                deleted_run = delete_model_run(deletion_model)
+                deleted_runs = delete_model_runs(
+                    [deletable_models[key] for key in deletion_keys]
+                )
                 st.cache_data.clear()
                 st.cache_resource.clear()
                 st.session_state["model_deleted_message"] = (
-                    f"Modelrun verwijderd: {deleted_run}"
+                    f"{len(deleted_runs)} modelrun(s) verwijderd: "
+                    + ", ".join(path.name for path in deleted_runs)
                 )
                 st.rerun()
         else:
