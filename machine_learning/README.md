@@ -83,13 +83,13 @@ Evaluatie met `python -m symbol_classifier.assess` vereist ook `symbol_classifie
 
 ### Visueel prestatiedashboard
 
-Het Streamlit-dashboard evalueert het huidige eindmodel en toont accuracy, balanced accuracy, macro-F1, precision en recall per klasse, normaliseerbare confusion matrices voor training en validatie, de verkeerd geclassificeerde afbeeldingen en inference op een uitsnede. De dataset-tab toont de klassebalans als cirkeldiagram en tabel voor de trainingsset, validatieset of beide samen. De learning-curve-tab visualiseert experimenten met verschillende hoeveelheden trainingsdata. In de inference-tab kun je direct uit relevante projectmappen kiezen of zelf een bestand uploaden:
+Het Streamlit-dashboard evalueert het huidige eindmodel en toont accuracy, balanced accuracy, macro-F1, precision en recall per klasse, normaliseerbare confusion matrices voor training en validatie, de verkeerd geclassificeerde afbeeldingen en inference op een uitsnede. De dataset-tab toont de klassebalans als cirkeldiagram en tabel voor de trainingsset, validatieset of beide samen. De tab **Training runs** toont de verhouding tussen het aantal gebruikte trainingsafbeeldingen en de gemiddelde validatie-accuracy over de seeds. In de inference-tab kun je direct uit relevante projectmappen kiezen of zelf een bestand uploaden:
 
 ```powershell
 python -m streamlit run src/symbol_classifier/dashboard.py
 ```
 
-Nieuwe trainingen schrijven daarnaast `history.csv` en TensorBoard-logs onder `runs/classifier/<tijdstip>/`. In de tab **Trainingscurves** kun je zowel gewone classifier-runs als de afzonderlijke runs van een learning-curve-experiment kiezen. Voor het volledige TensorBoard-overzicht van beide typen gebruik je:
+Nieuwe trainingen schrijven daarnaast `history.csv` en TensorBoard-logs onder `runs/classifier/<tijdstip>/`. Voor de curves per epoch en het volledige overzicht van alle runs gebruik je TensorBoard:
 
 ```powershell
 python -m tensorboard.main --logdir runs
@@ -113,7 +113,7 @@ python -m symbol_classifier.experiments.learning_curve
 
 De resultaten komen in `runs/learning_curve/<tijdstip>/`. `results.csv` bevat de algemene metrics, `per_class.csv` bevat precision, recall en F1 per klasse en iedere submap bevat de trainingshistorie en TensorBoard-logs. Individuele modellen worden standaard niet bewaard. Voeg `--save-models` toe als die ook nodig zijn. Een onderbroken experiment kan met `--output-dir runs/learning_curve/<tijdstip>` worden hervat; reeds voltooide combinaties worden dan overgeslagen.
 
-De learning-curve-tab van het dashboard leest automatisch het nieuwste resultaatbestand. De huidige train- en validatie-uitsneden komen wel uit dezelfde twee bronafbeeldingen. Het experiment meet daardoor interne verbetering op deze afbeeldingen en nog geen generalisatie naar nieuw handschrift of nieuwe foto’s.
+De tab **Training runs** van het dashboard leest automatisch het nieuwste resultaatbestand. Hij groepeert de seeds per hoeveelheid trainingsdata en toont het gemiddelde met één standaardafwijking. De huidige train- en validatie-uitsneden komen wel uit dezelfde twee bronafbeeldingen. Het experiment meet daardoor interne verbetering op deze afbeeldingen en nog geen generalisatie naar nieuw handschrift of nieuwe foto’s.
 
 De klasseverdeling van de actuele trainingsdataset (`symbols_and_operators/classifier/`) kun je vanuit de projecthoofdmap zo bekijken:
 

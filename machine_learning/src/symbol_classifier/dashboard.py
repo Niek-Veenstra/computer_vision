@@ -17,7 +17,6 @@ from PIL import Image
 MODEL_PATH = Path("symbol_classifier_final.keras")
 DATA_DIR = Path("symbols_and_operators/classifier")
 CLASS_FILE = Path("symbols_and_operators/classes.txt")
-RUNS_DIR = Path("runs/classifier")
 LEARNING_CURVE_DIR = Path("runs/learning_curve")
 IMAGE_SIZE = (128, 128)
 BATCH_SIZE = 32
@@ -164,37 +163,6 @@ def dataset_balance_figure(counts: np.ndarray, labels: list[str], title: str) ->
     return figure
 
 
-def available_histories() -> list[Path]:
-    histories = list(RUNS_DIR.glob("*/history.csv"))
-    histories.extend(LEARNING_CURVE_DIR.glob("*/*/history.csv"))
-    return sorted(histories, key=lambda path: path.stat().st_mtime, reverse=True)
-
-
-def history_label(history_path: Path) -> str:
-    try:
-        relative_path = history_path.relative_to(LEARNING_CURVE_DIR)
-        return f"Learning curve / {relative_path.parent.as_posix()}"
-    except ValueError:
-        return f"Classifier / {history_path.parent.name}"
-
-
-def history_figure(history_path: Path) -> plt.Figure:
-    with history_path.open(encoding="utf-8", newline="") as file:
-        rows = list(csv.DictReader(file))
-    epochs = [int(row["epoch"]) + 1 for row in rows]
-    figure, (loss_axis, accuracy_axis) = plt.subplots(1, 2, figsize=(11, 4))
-    loss_axis.plot(epochs, [float(row["loss"]) for row in rows], label="Training")
-    loss_axis.plot(epochs, [float(row["val_loss"]) for row in rows], label="Validatie")
-    loss_axis.set(title="Loss", xlabel="Epoch", ylabel="Loss")
-    loss_axis.legend()
-    accuracy_axis.plot(epochs, [float(row["accuracy"]) for row in rows], label="Training")
-    accuracy_axis.plot(epochs, [float(row["val_accuracy"]) for row in rows], label="Validatie")
-    accuracy_axis.set(title="Accuracy", xlabel="Epoch", ylabel="Accuracy", ylim=(0, 1))
-    accuracy_axis.legend()
-    figure.tight_layout()
-    return figure
-
-
 def latest_learning_curve_results() -> Path | None:
     results = sorted(
         LEARNING_CURVE_DIR.glob("*/results.csv"),
@@ -238,14 +206,6 @@ def learning_curve_figure(rows: list[dict], metric: str, label: str) -> plt.Figu
         for size in training_sizes
     ]
     figure, axis = plt.subplots(figsize=(7, 4.5))
-    for size in training_sizes:
-        axis.scatter(
-            [size] * len(grouped[size]),
-            grouped[size],
-            color="tab:blue",
-            alpha=0.35,
-            zorder=2,
-        )
     axis.errorbar(
         training_sizes,
         means,
@@ -268,6 +228,35 @@ def learning_curve_figure(rows: list[dict], metric: str, label: str) -> plt.Figu
     axis.legend()
     figure.tight_layout()
     return figure
+
+
+def learning_curve_summary(rows: list[dict]) -> list[dict]:
+    grouped: dict[int, list[dict]] = {}
+    for row in rows:
+        grouped.setdefault(row["training_images"], []).append(row)
+
+    summary = []
+    for training_images in sorted(grouped):
+        group = grouped[training_images]
+        accuracies = [row["accuracy"] for row in group]
+        summary.append(
+            {
+                "Trainingsdeel": group[0]["fraction"],
+                "Trainingsbeelden": training_images,
+                "Aantal runs": len(group),
+                "Gemiddelde accuracy": float(np.mean(accuracies)),
+                "Spreiding accuracy": (
+                    float(np.std(accuracies, ddof=1)) if len(accuracies) > 1 else 0.0
+                ),
+                "Gemiddelde balanced accuracy": float(
+                    np.mean([row["balanced_accuracy"] for row in group])
+                ),
+                "Gemiddelde macro-F1": float(
+                    np.mean([row["macro_f1"] for row in group])
+                ),
+            }
+        )
+    return summary
 
 
 def main() -> None:
@@ -315,7 +304,6 @@ def main() -> None:
         inference_tab,
         dataset_tab,
         learning_curve_tab,
-        training_tab,
     ) = st.tabs(
         [
             "Per klasse",
@@ -323,8 +311,7 @@ def main() -> None:
             "Fouten",
             "Inference",
             "Dataset",
-            "Learning curve",
-            "Trainingscurves",
+            "Training runs",
         ]
     )
 
@@ -490,7 +477,7 @@ def main() -> None:
         )
 
     with learning_curve_tab:
-        st.subheader("Invloed van de hoeveelheid trainingsdata")
+        st.subheader("Trainingsdata tegenover validatieprestaties")
         results_path = latest_learning_curve_results()
         st.code(
             "python -m symbol_classifier.experiments.learning_curve",
@@ -503,9 +490,9 @@ def main() -> None:
                 f"{len(learning_rows)} voltooide runs"
             )
             metric_options = {
-                "Macro-F1": "macro_f1",
-                "Balanced accuracy": "balanced_accuracy",
                 "Accuracy": "accuracy",
+                "Balanced accuracy": "balanced_accuracy",
+                "Macro-F1": "macro_f1",
                 "Macro-precision": "macro_precision",
                 "Validatieloss": "validation_loss",
             }
@@ -520,54 +507,28 @@ def main() -> None:
                 width="content",
             )
             st.dataframe(
-                [
-                    {
-                        "Trainingsdeel": row["fraction"],
-                        "Trainingsbeelden": row["training_images"],
-                        "Seed": row["seed"],
-                        "Beste epoch": row["best_epoch"],
-                        "Accuracy": row["accuracy"],
-                        "Balanced accuracy": row["balanced_accuracy"],
-                        "Macro-F1": row["macro_f1"],
-                        "Validatieloss": row["validation_loss"],
-                    }
-                    for row in sorted(
-                        learning_rows,
-                        key=lambda row: (row["training_images"], row["seed"]),
-                    )
-                ],
+                learning_curve_summary(learning_rows),
                 hide_index=True,
                 width="stretch",
                 column_config={
                     "Trainingsdeel": st.column_config.NumberColumn(format="percent"),
-                    "Accuracy": st.column_config.NumberColumn(format="percent"),
-                    "Balanced accuracy": st.column_config.NumberColumn(format="percent"),
-                    "Macro-F1": st.column_config.NumberColumn(format="percent"),
+                    "Gemiddelde accuracy": st.column_config.NumberColumn(format="percent"),
+                    "Spreiding accuracy": st.column_config.NumberColumn(format="percent"),
+                    "Gemiddelde balanced accuracy": st.column_config.NumberColumn(
+                        format="percent"
+                    ),
+                    "Gemiddelde macro-F1": st.column_config.NumberColumn(format="percent"),
                 },
             )
             st.caption(
-                "De punten zijn individuele seeds; de lijn toont het gemiddelde en "
-                "de foutbalken tonen één standaardafwijking."
+                "De lijn toont het gemiddelde van de seeds per hoeveelheid data. "
+                "De foutbalken tonen één standaardafwijking."
             )
         else:
             st.info(
                 "Er zijn nog geen resultaten. Voer eerst het bovenstaande commando uit. "
                 "Met --dry-run kun je de subsets controleren zonder modellen te trainen."
             )
-
-    with training_tab:
-        histories = available_histories()
-        if histories:
-            history_path = st.selectbox(
-                "Trainingsrun",
-                histories,
-                format_func=history_label,
-            )
-            st.caption(f"Historie: {history_path}")
-            st.pyplot(history_figure(history_path), width="stretch")
-        else:
-            st.info("Er zijn nog geen gelogde trainingsruns.")
-        st.code("python -m tensorboard.main --logdir runs", language="powershell")
 
     st.caption(
         "De train- en validatie-uitsneden komen uit dezelfde twee bronafbeeldingen. "
