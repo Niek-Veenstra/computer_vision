@@ -12,6 +12,7 @@
 - Dashboard training records the selected learning rate in run metadata and status. Adam uses that value as its initial learning rate before `ReduceLROnPlateau` can lower it.
 - Dashboard-started training stores its process ID in `status.json`. The dashboard may terminate only runs with a `starting` or `running` status below `runs/models/`, after which it records `stopped` while retaining partial artifacts.
 - The dashboard may delete only a selected run directory whose resolved path is exactly two levels below `runs/models/`. Keep the baseline model and registered architecture functions protected.
+- Classifier images are resized directly to `128×128` with bilinear interpolation, without preserving their aspect ratio. The dashboard's resize comparison defaults to this same operation and uses contrast-based diff metrics to reduce the influence of the shared background.
 
 ## Recorded confusion issue
 

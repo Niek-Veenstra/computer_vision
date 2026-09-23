@@ -39,6 +39,12 @@ PROJECT_IMAGE_DIRS = {
     "Bronafbeeldingen": Path("source_images"),
 }
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
+RESIZE_FILTERS = {
+    "Bilinear — modelstandaard": Image.Resampling.BILINEAR,
+    "Nearest neighbour": Image.Resampling.NEAREST,
+    "Bicubic": Image.Resampling.BICUBIC,
+    "Lanczos": Image.Resampling.LANCZOS,
+}
 
 
 def read_json(path: Path) -> dict:
@@ -336,6 +342,71 @@ def symbol_for(folder: str, symbols: list[str]) -> str:
     return symbols[int(folder.removeprefix("class_"))]
 
 
+def load_rgb_image(path: Path) -> Image.Image:
+    with Image.open(path) as source_image:
+        return source_image.convert("RGB")
+
+
+def image_contrast(image: Image.Image) -> tuple[np.ndarray, float]:
+    grayscale = np.asarray(image.convert("L"), dtype=np.float32)
+    border = np.concatenate(
+        (grayscale[0, :], grayscale[-1, :], grayscale[:, 0], grayscale[:, -1])
+    )
+    background = float(np.median(border))
+    return np.abs(grayscale - background) / 255.0, background
+
+
+def resize_comparison(
+    first_image: Image.Image,
+    second_image: Image.Image,
+    resize_filter: Image.Resampling,
+    difference_strength: float,
+) -> dict:
+    resized_first = first_image.resize(IMAGE_SIZE, resample=resize_filter)
+    resized_second = second_image.resize(IMAGE_SIZE, resample=resize_filter)
+    first_pixels = np.asarray(resized_first, dtype=np.float32)
+    second_pixels = np.asarray(resized_second, dtype=np.float32)
+    absolute_difference = np.abs(first_pixels - second_pixels)
+
+    first_contrast, first_background = image_contrast(resized_first)
+    second_contrast, second_background = image_contrast(resized_second)
+    contrast_difference = np.abs(first_contrast - second_contrast)
+    difference_image = Image.fromarray(
+        np.uint8(np.clip(contrast_difference * difference_strength * 255.0, 0, 255))
+    )
+
+    overlay = np.zeros((*IMAGE_SIZE[::-1], 3), dtype=np.float32)
+    overlay[..., 0] = first_contrast
+    overlay[..., 1] = second_contrast
+    overlay[..., 2] = second_contrast
+    overlay_image = Image.fromarray(np.uint8(np.clip(overlay * 255.0, 0, 255)))
+
+    first_mask = first_contrast > 0.125
+    second_mask = second_contrast > 0.125
+    intersection = int(np.logical_and(first_mask, second_mask).sum())
+    union = int(np.logical_or(first_mask, second_mask).sum())
+    denominator = float(np.linalg.norm(first_contrast) * np.linalg.norm(second_contrast))
+    cosine_similarity = (
+        float(np.sum(first_contrast * second_contrast) / denominator)
+        if denominator
+        else 0.0
+    )
+
+    return {
+        "resized_first": resized_first,
+        "resized_second": resized_second,
+        "difference_image": difference_image,
+        "overlay_image": overlay_image,
+        "mean_absolute_difference": float(absolute_difference.mean() / 255.0),
+        "contrast_cosine_similarity": cosine_similarity,
+        "foreground_iou": float(intersection / union) if union else 0.0,
+        "first_foreground_fraction": float(first_mask.mean()),
+        "second_foreground_fraction": float(second_mask.mean()),
+        "first_background": first_background,
+        "second_background": second_background,
+    }
+
+
 def confusion_figure(matrix: np.ndarray, labels: list[str], normalized: bool) -> plt.Figure:
     values = matrix.astype(np.float64)
     if normalized:
@@ -565,6 +636,7 @@ def main() -> None:
         errors_tab,
         inference_tab,
         dataset_tab,
+        resize_comparison_tab,
         model_training_tab,
         learning_curve_tab,
     ) = st.tabs(
@@ -574,6 +646,7 @@ def main() -> None:
             "Fouten",
             "Inference",
             "Dataset",
+            "Resize vergelijking",
             "Model trainen",
             "Training runs",
         ]
@@ -741,6 +814,154 @@ def main() -> None:
                 )
             },
         )
+
+    with resize_comparison_tab:
+        st.subheader("Twee datasetbeelden na resize vergelijken")
+        st.write(
+            "Vergelijk twee uitsneden vóór en na dezelfde resize die de classifier gebruikt. "
+            "Bilinear is de standaard van `image_dataset_from_directory`."
+        )
+        comparison_controls = st.columns(3)
+        comparison_split = comparison_controls[0].radio(
+            "Datasetdeel",
+            ("Training", "Validatie"),
+            horizontal=True,
+            key="resize_comparison_split",
+        )
+        resize_filter_label = comparison_controls[1].selectbox(
+            "Resize-methode",
+            tuple(RESIZE_FILTERS),
+            key="resize_comparison_filter",
+        )
+        difference_strength = comparison_controls[2].slider(
+            "Diff versterken",
+            min_value=1.0,
+            max_value=10.0,
+            value=4.0,
+            step=0.5,
+        )
+        comparison_directory = DATA_DIR / (
+            "train" if comparison_split == "Training" else "val"
+        )
+        comparison_classes = validation_results["class_names"]
+        class_labels = {
+            folder: f"{symbol_for(folder, symbols)} ({folder})"
+            for folder in comparison_classes
+        }
+        first_default = next(
+            (
+                index
+                for index, folder in enumerate(comparison_classes)
+                if symbol_for(folder, symbols) == "-"
+            ),
+            0,
+        )
+        second_default = next(
+            (
+                index
+                for index, folder in enumerate(comparison_classes)
+                if symbol_for(folder, symbols) == "*"
+            ),
+            0,
+        )
+        selection_columns = st.columns(2)
+        with selection_columns[0]:
+            first_class = st.selectbox(
+                "Klasse A",
+                comparison_classes,
+                index=first_default,
+                format_func=lambda folder: class_labels[folder],
+                key="resize_comparison_class_a",
+            )
+            first_images = project_images(comparison_directory / first_class)
+            first_path = st.selectbox(
+                "Afbeelding A",
+                first_images,
+                format_func=lambda path: path.name,
+                key="resize_comparison_image_a",
+            )
+        with selection_columns[1]:
+            second_class = st.selectbox(
+                "Klasse B",
+                comparison_classes,
+                index=second_default,
+                format_func=lambda folder: class_labels[folder],
+                key="resize_comparison_class_b",
+            )
+            second_images = project_images(comparison_directory / second_class)
+            second_path = st.selectbox(
+                "Afbeelding B",
+                second_images,
+                format_func=lambda path: path.name,
+                key="resize_comparison_image_b",
+            )
+
+        if first_path and second_path:
+            first_image = load_rgb_image(first_path)
+            second_image = load_rgb_image(second_path)
+            original_columns = st.columns(2)
+            original_columns[0].image(
+                first_image,
+                caption=f"A origineel — {first_image.width}×{first_image.height}",
+                width=240,
+            )
+            original_columns[1].image(
+                second_image,
+                caption=f"B origineel — {second_image.width}×{second_image.height}",
+                width=240,
+            )
+            comparison = resize_comparison(
+                first_image,
+                second_image,
+                RESIZE_FILTERS[resize_filter_label],
+                difference_strength,
+            )
+            resized_columns = st.columns(2)
+            resized_columns[0].image(
+                comparison["resized_first"], caption="A na resize — 128×128", width=256
+            )
+            resized_columns[1].image(
+                comparison["resized_second"], caption="B na resize — 128×128", width=256
+            )
+
+            metric_columns = st.columns(4)
+            metric_columns[0].metric(
+                "Gemiddeld pixelverschil",
+                f"{comparison['mean_absolute_difference']:.1%}",
+            )
+            metric_columns[1].metric(
+                "Contrast-cosinus",
+                f"{comparison['contrast_cosine_similarity']:.1%}",
+                help="Hoger betekent dat de contrastpatronen op dezelfde posities meer op elkaar lijken.",
+            )
+            metric_columns[2].metric(
+                "Voorgrond-overlap (IoU)",
+                f"{comparison['foreground_iou']:.1%}",
+            )
+            metric_columns[3].metric(
+                "Voorgrond A / B",
+                (
+                    f"{comparison['first_foreground_fraction']:.1%} / "
+                    f"{comparison['second_foreground_fraction']:.1%}"
+                ),
+            )
+            difference_columns = st.columns(2)
+            difference_columns[0].image(
+                comparison["difference_image"],
+                caption="Contrastverschil — wit betekent meer verschil",
+                width=320,
+            )
+            difference_columns[1].image(
+                comparison["overlay_image"],
+                caption="Overlay — A rood, B cyaan, overlap wit",
+                width=320,
+            )
+            st.caption(
+                f"Schaalfactor A: {IMAGE_SIZE[0] / first_image.width:.2f}× breed en "
+                f"{IMAGE_SIZE[1] / first_image.height:.2f}× hoog. "
+                f"Schaalfactor B: {IMAGE_SIZE[0] / second_image.width:.2f}× breed en "
+                f"{IMAGE_SIZE[1] / second_image.height:.2f}× hoog."
+            )
 
     with model_training_tab:
         st.subheader("Nieuw model trainen")
