@@ -134,3 +134,17 @@ De volgende punten zijn geschikte experimenten om de prestaties en generalisatie
 Een logisch eerste experiment combineert ongeveer 10% extra ruimte rond ieder begrenzingskader, behoud van de beeldverhouding en een willekeurige rotatie van maximaal 5 graden. Pas augmentatie alleen op de trainingsset toe. Gebruik geen horizontale of verticale spiegeling en vermijd grote rotaties, omdat daarmee de betekenis van symbolen kan veranderen. Houd de bestaande validatieset ongewijzigd tijdens een vergelijking, zodat het effect van iedere aanpassing meetbaar blijft.
 
 `dataset.analysis.duplicate_detection` en `dataset.analysis.image_sizes_aspect_ratios` gebruiken nog de oudere, ongesplitste map `new_symbols_operators_dataset/` als invoer.
+
+## Logboek
+
+### 2026-09-23 – Confusionanalyse CNN v1 en toevoeging CNN v2
+
+De per-klasse-resultaten van het dashboard horen bij het lokaal opgeslagen `symbol_classifier_final.keras`. Dit model gebruikt CNN v1 uit `build_cnn()`. Op de huidige validatieset bevat klasse `0` 23 afbeeldingen. Het model classificeert daarvan 21 correct en twee als `8`, wat een recall van ongeveer 91,3% geeft.
+
+Het belangrijkste probleem is de precision van klasse `0`. Het model voorspelt 31 afbeeldingen als `0`, waarvan er 21 werkelijk een nul zijn. De overige tien voorspellingen zijn false positives: drie zessen, drie vieren, één acht, één twee, één vijf en één deelteken worden als `0` geclassificeerd. Daardoor heeft `0` bij dit model ongeveer 67,7% precision en 77,8% F1. Het model kan nullen dus meestal vinden, maar gebruikt de klasse `0` te vaak voor visueel vergelijkbare ronde symbolen. Vooral de verwarring `6 → 0` en `4 → 0` is een concreet verbeterpunt.
+
+De drie 100%-runs van het learning-curve-experiment kwamen voor `0` gemiddeld uit op ongeveer 79% precision, 90% recall en 84% F1. Die modellen zijn niet opgeslagen en hebben `symbol_classifier_final.keras` niet vervangen. De laagste gemiddelde F1-scores in dat experiment waren ongeveer 75% voor `*` en 78% voor `-`. Deze waarden zijn onzeker omdat de validatieset slechts vijf sterren en tien mintekens bevat.
+
+Als architectuurexperiment is `build_cnn_v2()` toegevoegd. CNN v1 heeft 4.289.615 parameters, waarvan ongeveer 4,2 miljoen in de verbinding tussen `Flatten()` en `Dense(128)` zitten. CNN v2 gebruikt vier convolutionele blokken met batch normalization, gevolgd door `GlobalAveragePooling2D`, `Dense(128)` en dropout van 0,3. Deze variant heeft 424.687 parameters. De hypothese is dat hij minder makkelijk voorbeelden memoriseert en robuustere vormkenmerken leert voor onder andere `0`, `4`, `6`, `8` en `9`. CNN v2 is nog niet getraind of geëvalueerd; bovenstaande confusion-resultaten mogen daarom niet aan deze variant worden toegeschreven.
+
+Alle genoemde validatieresultaten blijven een interne meting: de trainings- en validatie-uitsneden komen uit dezelfde twee bronafbeeldingen. Een toekomstige vergelijking tussen CNN v1 en CNN v2 moet dezelfde dataset, validatieset en meerdere seeds gebruiken.
