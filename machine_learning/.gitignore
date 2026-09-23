@@ -11,4 +11,6 @@ __pycache__
 symbols_and_operators/classifier/
 symbol_classifier.keras
 symbol_classifier_final.keras
+runs/classifier/
+runs/learning_curve/
 

@@ -1,6 +1,8 @@
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import json
+from datetime import datetime
+from pathlib import Path
 from tensorflow import keras
 import symbol_classifier
 from symbol_classifier.dataset import get_dataset
@@ -22,6 +24,8 @@ def compute_class_weights(train_ds, num_classes: int):
     return weights, counts
 
 def main():
+    run_dir = Path("runs/classifier") / datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir.mkdir(parents=True)
     train_set, validation_set = get_dataset(
         "symbols_and_operators/classifier",
         TARGET_SIZE,
@@ -53,6 +57,8 @@ def main():
             patience=2,
             min_lr=1e-6
         ),
+        keras.callbacks.CSVLogger(run_dir / "history.csv"),
+        keras.callbacks.TensorBoard(log_dir=run_dir / "tensorboard"),
     ]
 
     model.fit(
@@ -65,7 +71,8 @@ def main():
     )
 
     model.save("symbol_classifier_final.keras")
-    print("Done traing. Saved as symbol_classifier.keras and symbol_classifier_final.keras")
+    print(f"Training metrics saved in {run_dir}")
+    print("Done training. Saved as symbol_classifier.keras and symbol_classifier_final.keras")
 
 if __name__ == "__main__":
     main()
