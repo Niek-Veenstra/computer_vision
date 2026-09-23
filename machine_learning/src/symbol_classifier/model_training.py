@@ -123,6 +123,7 @@ def train_model(
     epochs: int,
     seed: int,
     batch_size: int,
+    learning_rate: float,
     run_dir: Path,
 ) -> Path:
     if model_name not in MODEL_BUILDERS:
@@ -138,6 +139,7 @@ def train_model(
         "epochs": epochs,
         "seed": seed,
         "batch_size": batch_size,
+        "learning_rate": learning_rate,
         "started_at": started_at,
     }
     write_json(
@@ -163,7 +165,9 @@ def train_model(
         class_weights, class_counts = compute_class_weights(
             train_dataset, len(class_names)
         )
-        model = MODEL_BUILDERS[model_name](num_classes=len(class_names))
+        model = MODEL_BUILDERS[model_name](
+            num_classes=len(class_names), learning_rate=learning_rate
+        )
         model.build((None, *IMAGE_SIZE, 3))
         metadata = {
             **base_status,
@@ -255,6 +259,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
+    parser.add_argument("--learning-rate", type=float, default=0.001)
     parser.add_argument("--run-dir", type=Path)
     return parser.parse_args()
 
@@ -265,6 +270,8 @@ def main() -> None:
         raise ValueError("Epochs must be at least 1")
     if args.batch_size < 1:
         raise ValueError("Batch size must be at least 1")
+    if args.learning_rate <= 0:
+        raise ValueError("Learning rate must be larger than 0")
     run_dir = args.run_dir or (
         MODEL_RUNS_DIR
         / args.model
@@ -275,6 +282,7 @@ def main() -> None:
         epochs=args.epochs,
         seed=args.seed,
         batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
         run_dir=run_dir,
     )
 

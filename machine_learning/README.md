@@ -89,7 +89,9 @@ Het Streamlit-dashboard evalueert een geselecteerd model en toont accuracy, bala
 python -m streamlit run src/symbol_classifier/dashboard.py
 ```
 
-In de tab **Model trainen** kies je `build_cnn()` (CNN v1) of `build_cnn_v2()` (CNN v2), het maximale aantal epochs, de seed en de batchgrootte. De training draait als een apart lokaal Python-proces, zodat het dashboard bruikbaar blijft. Met **Status vernieuwen** zie je de actuele epoch, validatie-accuracy en trainingslog. Na voltooiing verschijnt de run in de modelselector bovenaan.
+In de tab **Model trainen** kies je `build_cnn()` (CNN v1) of `build_cnn_v2()` (CNN v2), het maximale aantal epochs, de seed, de batchgrootte en de learning rate. De standaard learning rate is `0.001`. De gekozen waarde initialiseert de Adam-optimizer en wordt in de metadata en status van de run opgeslagen. De training draait als een apart lokaal Python-proces, zodat het dashboard bruikbaar blijft. Met **Status vernieuwen** zie je de actuele epoch, validatie-accuracy en trainingslog. Na voltooiing verschijnt de run in de modelselector bovenaan.
+
+Onder in dezelfde tab kun je een voltooide dashboardrun verwijderen. Dit verwijdert de volledige gekozen runmap met de gecompileerde modellen, metrics, historie en TensorBoard-data. De functies `build_cnn()` en `build_cnn_v2()` blijven in de broncode staan. De bestaande baseline `symbol_classifier_final.keras` is niet verwijderbaar vanuit het dashboard.
 
 Iedere dashboardtraining krijgt een eigen map onder `runs/models/<architectuur>/<tijdstip>/` met:
 
@@ -104,7 +106,7 @@ Iedere dashboardtraining krijgt een eigen map onder `runs/models/<architectuur>/
 Dezelfde trainer kan ook buiten Streamlit worden gestart:
 
 ```powershell
-python -m symbol_classifier.model_training --model cnn_v2 --epochs 25 --seed 42
+python -m symbol_classifier.model_training --model cnn_v2 --epochs 25 --seed 42 --learning-rate 0.001
 ```
 
 De dashboardtraining overschrijft `symbol_classifier_final.keras` niet. De bestaande baseline en iedere nieuwe run blijven afzonderlijk selecteerbaar.

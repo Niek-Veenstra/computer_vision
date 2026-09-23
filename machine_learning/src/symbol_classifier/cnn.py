@@ -1,7 +1,8 @@
 import keras.layers as layers
 import keras.models as models
+from keras import optimizers
 
-def build_cnn(num_classes=14):
+def build_cnn(num_classes=14, learning_rate=0.001):
     model = models.Sequential([
         layers.Rescaling(1./255),
 
@@ -22,7 +23,7 @@ def build_cnn(num_classes=14):
     ])
 
     model.compile(
-        optimizer='adam',
+        optimizer=optimizers.Adam(learning_rate=learning_rate),
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -30,7 +31,7 @@ def build_cnn(num_classes=14):
     return model
 
 
-def build_cnn_v2(num_classes=14):
+def build_cnn_v2(num_classes=14, learning_rate=0.001):
     """Build a lower-parameter CNN with normalized convolutional features."""
     model = models.Sequential([
         layers.Rescaling(1./255),
@@ -61,7 +62,7 @@ def build_cnn_v2(num_classes=14):
     ], name="symbol_classifier_cnn_v2")
 
     model.compile(
-        optimizer='adam',
+        optimizer=optimizers.Adam(learning_rate=learning_rate),
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )

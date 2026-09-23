@@ -9,6 +9,8 @@
 - The first full CNN v2 run is `runs/models/cnn_v2/20260923-113833-103317`. It failed validation and must not be treated as an improvement over CNN v1.
 - Dashboard-started model runs are isolated under `runs/models/<architecture>/<run-id>/` and never replace the baseline file.
 - The dashboard model selector controls metrics, confusion matrices, error examples and inference together. Always report the selected architecture and run when discussing dashboard results.
+- Dashboard training records the selected learning rate in run metadata and status. Adam uses that value as its initial learning rate before `ReduceLROnPlateau` can lower it.
+- The dashboard may delete only a selected run directory whose resolved path is exactly two levels below `runs/models/`. Keep the baseline model and registered architecture functions protected.
 
 ## Recorded confusion issue
 

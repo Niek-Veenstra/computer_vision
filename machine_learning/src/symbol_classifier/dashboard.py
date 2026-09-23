@@ -3,6 +3,7 @@
 import csv
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -91,6 +92,7 @@ def start_training_process(
     epochs: int,
     seed: int,
     batch_size: int,
+    learning_rate: float,
 ) -> tuple[Path, int]:
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     architecture_dir = MODEL_RUNS_DIR / model_name
@@ -109,6 +111,8 @@ def start_training_process(
         str(seed),
         "--batch-size",
         str(batch_size),
+        "--learning-rate",
+        str(learning_rate),
         "--run-dir",
         str(run_dir.resolve()),
     ]
@@ -139,11 +143,30 @@ def training_status_rows(statuses: list[tuple[Path, dict]]) -> list[dict]:
                 "Status": status.get("state", "unknown"),
                 "Epoch": status.get("current_epoch", 0),
                 "Max epochs": status.get("epochs", 0),
+                "Learning rate": status.get("learning_rate"),
                 "Val accuracy": validation_accuracy,
                 "Macro-F1": metrics.get("macro_f1"),
             }
         )
     return rows
+
+
+def delete_model_run(model_record: dict) -> Path:
+    model_path = Path(model_record["path"]).resolve()
+    model_runs_root = MODEL_RUNS_DIR.resolve()
+    run_dir = model_path.parent
+    if (
+        model_path.name != "final.keras"
+        or run_dir.parent.parent != model_runs_root
+        or not run_dir.is_relative_to(model_runs_root)
+    ):
+        raise ValueError(f"Refusing to delete model outside {model_runs_root}")
+
+    log_path = run_dir.parent / f"{run_dir.name}.log"
+    shutil.rmtree(run_dir)
+    if log_path.is_file():
+        log_path.unlink()
+    return run_dir
 
 
 def dataset_signature(directory: Path) -> tuple[tuple[str, int], ...]:
@@ -394,6 +417,11 @@ def main() -> None:
     if not trained_models:
         st.error("Er is nog geen getraind model beschikbaar.")
         st.stop()
+    if st.session_state.get("evaluation_model") not in (None, *trained_models):
+        st.session_state.pop("evaluation_model")
+    deleted_message = st.session_state.pop("model_deleted_message", None)
+    if deleted_message:
+        st.success(deleted_message)
     selected_model_key = st.selectbox(
         "Model voor resultaten en inference",
         tuple(trained_models),
@@ -410,6 +438,7 @@ def main() -> None:
         st.caption(
             f"Seed {selected_metadata.get('seed', '?')} · "
             f"maximaal {selected_metadata.get('epochs', '?')} epochs · "
+            f"learning rate {selected_metadata.get('learning_rate', '?')} · "
             f"{selected_metadata.get('parameters', '?')} parameters"
         )
 
@@ -632,7 +661,7 @@ def main() -> None:
                 tuple(MODEL_BUILDERS),
                 format_func=lambda name: MODEL_LABELS[name],
             )
-            training_columns = st.columns(3)
+            training_columns = st.columns(4)
             epochs = training_columns[0].number_input(
                 "Max epochs", min_value=1, max_value=200, value=25, step=1
             )
@@ -641,6 +670,14 @@ def main() -> None:
             )
             batch_size = training_columns[2].number_input(
                 "Batchgrootte", min_value=1, max_value=256, value=32, step=1
+            )
+            learning_rate = training_columns[3].number_input(
+                "Learning rate",
+                min_value=0.000001,
+                max_value=0.1,
+                value=0.001,
+                step=0.0001,
+                format="%.6f",
             )
             start_training = st.form_submit_button(
                 "Start training", type="primary"
@@ -652,6 +689,7 @@ def main() -> None:
                 int(epochs),
                 int(seed),
                 int(batch_size),
+                float(learning_rate),
             )
             st.success(
                 f"Training gestart als proces {process_id}. Run: {run_dir}"
@@ -702,6 +740,46 @@ def main() -> None:
                     st.caption("De trainingslog wordt momenteel bijgewerkt.")
         else:
             st.info("Er zijn nog geen modeltrainingen vanuit het dashboard gestart.")
+
+        st.divider()
+        st.subheader("Getrainde modelrun verwijderen")
+        deletable_models = {
+            key: model
+            for key, model in trained_models.items()
+            if key != "baseline"
+        }
+        if deletable_models:
+            deletion_key = st.selectbox(
+                "Modelrun",
+                tuple(deletable_models),
+                format_func=lambda key: deletable_models[key]["label"],
+                key="model_run_to_delete",
+            )
+            deletion_model = deletable_models[deletion_key]
+            st.caption(
+                "Hiermee verwijder je de opgeslagen weights, metrics, historie en "
+                "TensorBoard-data van deze run. De architectuurcode blijft bestaan."
+            )
+            confirm_deletion = st.checkbox(
+                f"Verwijder {deletion_model['label']} definitief"
+            )
+            if st.button(
+                "Verwijder modelrun",
+                type="primary",
+                disabled=not confirm_deletion,
+            ):
+                deleted_run = delete_model_run(deletion_model)
+                st.cache_data.clear()
+                st.cache_resource.clear()
+                st.session_state["model_deleted_message"] = (
+                    f"Modelrun verwijderd: {deleted_run}"
+                )
+                st.rerun()
+        else:
+            st.info(
+                "Er zijn nog geen verwijderbare dashboardruns. "
+                "De bestaande baseline blijft beschermd."
+            )
 
     with learning_curve_tab:
         st.subheader("Trainingsdata tegenover validatieprestaties")
