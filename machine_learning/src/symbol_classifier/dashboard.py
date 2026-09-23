@@ -562,7 +562,7 @@ def learning_curve_summary(rows: list[dict]) -> list[dict]:
 
 def main() -> None:
     st.set_page_config(page_title="Classifierprestaties", page_icon="📊", layout="wide")
-    st.title("Prestaties van de symboolclassifier")
+    st.title("Performance of the symbol classifier")
     st.caption("Evaluatie op symbols_and_operators/classifier/val")
 
     missing = [

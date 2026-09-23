@@ -5,17 +5,17 @@ from keras import optimizers
 def build_cnn(num_classes=14, learning_rate=0.001):
     model = models.Sequential([
         layers.Rescaling(1./255),
+        layers.RandomRotation(0.05),
+        layers.RandomZoom(0.001),
 
-        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
+        layers.Conv2D(16, (5, 5), activation='relu', padding='same'),
         layers.MaxPooling2D((2, 2)),
 
-        layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-        layers.MaxPooling2D((2, 2)),
-
-        layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
+        layers.Conv2D(32, (5, 5), activation='relu', padding='same'),
         layers.MaxPooling2D((2, 2)),
 
         layers.Flatten(),
+
         layers.Dense(128, activation='relu'),
         layers.Dropout(0.5),
 
@@ -54,8 +54,9 @@ def build_cnn_v2(num_classes=14, learning_rate=0.001):
         layers.Conv2D(256, (3, 3), padding='same', use_bias=False),
         layers.BatchNormalization(),
         layers.ReLU(),
+        layers.MaxPooling2D((2, 2)),
 
-        layers.GlobalAveragePooling2D(),
+        layers.Flatten(),
         layers.Dense(128, activation='relu'),
         layers.Dropout(0.3),
         layers.Dense(num_classes, activation='softmax')
