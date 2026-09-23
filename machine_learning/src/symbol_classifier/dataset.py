@@ -1,11 +1,11 @@
 from keras.utils import image_dataset_from_directory
 
-def get_dataset(dir, size, batch_size=32):
+def get_dataset(dir, size, batch_size=32, seed=42):
     train_ds = image_dataset_from_directory(
         f"{dir}/train",
         image_size=size,
         batch_size=batch_size,
-        seed=42,
+        seed=seed,
         label_mode="int",
     )
 

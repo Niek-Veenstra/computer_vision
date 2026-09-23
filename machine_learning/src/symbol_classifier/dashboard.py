@@ -1,7 +1,11 @@
 """Interactive validation dashboard for the symbol classifier."""
 
 import csv
+import json
 import os
+import subprocess
+import sys
+from datetime import datetime
 from pathlib import Path
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -13,11 +17,15 @@ import streamlit as st
 from keras.utils import image_dataset_from_directory
 from PIL import Image
 
+from symbol_classifier import MODEL_BUILDERS, MODEL_LABELS
+
 
 MODEL_PATH = Path("symbol_classifier_final.keras")
 DATA_DIR = Path("symbols_and_operators/classifier")
 CLASS_FILE = Path("symbols_and_operators/classes.txt")
 LEARNING_CURVE_DIR = Path("runs/learning_curve")
+MODEL_RUNS_DIR = Path("runs/models")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 IMAGE_SIZE = (128, 128)
 BATCH_SIZE = 32
 PROJECT_IMAGE_DIRS = {
@@ -27,6 +35,115 @@ PROJECT_IMAGE_DIRS = {
     "Bronafbeeldingen": Path("source_images"),
 }
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
+
+
+def read_json(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def available_trained_models() -> dict[str, dict]:
+    models_by_key: dict[str, dict] = {}
+    if MODEL_PATH.is_file():
+        models_by_key["baseline"] = {
+            "label": "CNN v1 — bestaande baseline",
+            "model_name": "cnn_v1",
+            "run_id": "baseline",
+            "path": MODEL_PATH,
+        }
+
+    run_models = sorted(
+        MODEL_RUNS_DIR.glob("*/*/final.keras"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for model_path in run_models:
+        metadata = read_json(model_path.parent / "metadata.json")
+        model_name = metadata.get("model_name", model_path.parent.parent.name)
+        run_id = metadata.get("run_id", model_path.parent.name)
+        key = str(model_path)
+        models_by_key[key] = {
+            "label": f"{MODEL_LABELS.get(model_name, model_name)} — {run_id}",
+            "model_name": model_name,
+            "run_id": run_id,
+            "path": model_path,
+            "metadata": metadata,
+        }
+    return models_by_key
+
+
+def model_training_statuses() -> list[tuple[Path, dict]]:
+    statuses = [
+        (path, read_json(path))
+        for path in MODEL_RUNS_DIR.glob("*/*/status.json")
+    ]
+    return sorted(
+        statuses,
+        key=lambda item: item[1].get("updated_at", ""),
+        reverse=True,
+    )
+
+
+def start_training_process(
+    model_name: str,
+    epochs: int,
+    seed: int,
+    batch_size: int,
+) -> tuple[Path, int]:
+    run_id = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    architecture_dir = MODEL_RUNS_DIR / model_name
+    architecture_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = architecture_dir / run_id
+    log_path = architecture_dir / f"{run_id}.log"
+    command = [
+        sys.executable,
+        "-m",
+        "symbol_classifier.model_training",
+        "--model",
+        model_name,
+        "--epochs",
+        str(epochs),
+        "--seed",
+        str(seed),
+        "--batch-size",
+        str(batch_size),
+        "--run-dir",
+        str(run_dir.resolve()),
+    ]
+    creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    with log_path.open("w", encoding="utf-8") as log_file:
+        process = subprocess.Popen(
+            command,
+            cwd=PROJECT_ROOT,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            creationflags=creation_flags,
+        )
+    return run_dir, process.pid
+
+
+def training_status_rows(statuses: list[tuple[Path, dict]]) -> list[dict]:
+    rows = []
+    for _, status in statuses:
+        metrics = status.get("metrics", status.get("latest_metrics", {}))
+        if status.get("state") == "completed":
+            validation_accuracy = metrics.get("accuracy")
+        else:
+            validation_accuracy = metrics.get("val_accuracy")
+        rows.append(
+            {
+                "Model": status.get("model_label", status.get("model_name", "?")),
+                "Run": status.get("run_id", "?"),
+                "Status": status.get("state", "unknown"),
+                "Epoch": status.get("current_epoch", 0),
+                "Max epochs": status.get("epochs", 0),
+                "Val accuracy": validation_accuracy,
+                "Macro-F1": metrics.get("macro_f1"),
+            }
+        )
+    return rows
 
 
 def dataset_signature(directory: Path) -> tuple[tuple[str, int], ...]:
@@ -266,25 +383,48 @@ def main() -> None:
 
     missing = [
         str(path)
-        for path in (MODEL_PATH, DATA_DIR / "train", DATA_DIR / "val", CLASS_FILE)
+        for path in (DATA_DIR / "train", DATA_DIR / "val", CLASS_FILE)
         if not path.exists()
     ]
     if missing:
         st.error("Ontbrekende bestanden: " + ", ".join(missing))
         st.stop()
 
+    trained_models = available_trained_models()
+    if not trained_models:
+        st.error("Er is nog geen getraind model beschikbaar.")
+        st.stop()
+    selected_model_key = st.selectbox(
+        "Model voor resultaten en inference",
+        tuple(trained_models),
+        format_func=lambda key: trained_models[key]["label"],
+        key="evaluation_model",
+    )
+    selected_model = trained_models[selected_model_key]
+    selected_model_path = selected_model["path"]
+    st.caption(
+        f"Geselecteerd: {selected_model['label']} — bestand: {selected_model_path}"
+    )
+    selected_metadata = selected_model.get("metadata", {})
+    if selected_metadata:
+        st.caption(
+            f"Seed {selected_metadata.get('seed', '?')} · "
+            f"maximaal {selected_metadata.get('epochs', '?')} epochs · "
+            f"{selected_metadata.get('parameters', '?')} parameters"
+        )
+
     validation_results = evaluate_model(
-        str(MODEL_PATH),
+        str(selected_model_path),
         str(DATA_DIR),
         "val",
-        MODEL_PATH.stat().st_mtime_ns,
+        selected_model_path.stat().st_mtime_ns,
         dataset_signature(DATA_DIR / "val"),
     )
     training_results = evaluate_model(
-        str(MODEL_PATH),
+        str(selected_model_path),
         str(DATA_DIR),
         "train",
-        MODEL_PATH.stat().st_mtime_ns,
+        selected_model_path.stat().st_mtime_ns,
         dataset_signature(DATA_DIR / "train"),
     )
     symbols = CLASS_FILE.read_text(encoding="utf-8").splitlines()
@@ -303,6 +443,7 @@ def main() -> None:
         errors_tab,
         inference_tab,
         dataset_tab,
+        model_training_tab,
         learning_curve_tab,
     ) = st.tabs(
         [
@@ -311,6 +452,7 @@ def main() -> None:
             "Fouten",
             "Inference",
             "Dataset",
+            "Model trainen",
             "Training runs",
         ]
     )
@@ -378,7 +520,7 @@ def main() -> None:
             })
 
     with inference_tab:
-        st.write("Test het huidige eindmodel met een uitgesneden symbool.")
+        st.write(f"Test {selected_model['label']} met een uitgesneden symbool.")
         source = st.radio("Afbeeldingsbron", ("Projectbestand", "Uploaden"), horizontal=True)
         selected_image = None
 
@@ -403,7 +545,9 @@ def main() -> None:
             with Image.open(selected_image) as source_image:
                 image = source_image.convert("RGB")
             array = np.asarray(image.resize(IMAGE_SIZE), dtype=np.float32)[None, ...]
-            model = load_inference_model(str(MODEL_PATH), MODEL_PATH.stat().st_mtime_ns)
+            model = load_inference_model(
+                str(selected_model_path), selected_model_path.stat().st_mtime_ns
+            )
             probabilities = model.predict(array, verbose=0)[0]
             top_indices = np.argsort(probabilities)[::-1][:5]
             st.image(image, width=280)
@@ -475,6 +619,89 @@ def main() -> None:
                 )
             },
         )
+
+    with model_training_tab:
+        st.subheader("Nieuw model trainen")
+        st.write(
+            "Iedere training krijgt een eigen runmap. Na voltooiing kun je het model "
+            "bovenaan selecteren voor resultaten en inference."
+        )
+        with st.form("model_training_form"):
+            training_model_name = st.selectbox(
+                "Modelfunctie",
+                tuple(MODEL_BUILDERS),
+                format_func=lambda name: MODEL_LABELS[name],
+            )
+            training_columns = st.columns(3)
+            epochs = training_columns[0].number_input(
+                "Max epochs", min_value=1, max_value=200, value=25, step=1
+            )
+            seed = training_columns[1].number_input(
+                "Seed", min_value=0, max_value=2_147_483_647, value=42, step=1
+            )
+            batch_size = training_columns[2].number_input(
+                "Batchgrootte", min_value=1, max_value=256, value=32, step=1
+            )
+            start_training = st.form_submit_button(
+                "Start training", type="primary"
+            )
+
+        if start_training:
+            run_dir, process_id = start_training_process(
+                training_model_name,
+                int(epochs),
+                int(seed),
+                int(batch_size),
+            )
+            st.success(
+                f"Training gestart als proces {process_id}. Run: {run_dir}"
+            )
+
+        st.button("Status vernieuwen")
+        statuses = model_training_statuses()
+        if statuses:
+            st.dataframe(
+                training_status_rows(statuses),
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "Val accuracy": st.column_config.NumberColumn(format="percent"),
+                    "Macro-F1": st.column_config.NumberColumn(format="percent"),
+                },
+            )
+            latest_status_path, latest_status = statuses[0]
+            maximum_epochs = max(1, int(latest_status.get("epochs", 1)))
+            current_epoch = min(
+                int(latest_status.get("current_epoch", 0)), maximum_epochs
+            )
+            progress_value = (
+                1.0
+                if latest_status.get("state") == "completed"
+                else current_epoch / maximum_epochs
+            )
+            st.progress(
+                progress_value,
+                text=(
+                    f"Laatste run: {latest_status.get('model_label', '?')} — "
+                    f"{latest_status.get('state', 'unknown')} — "
+                    f"epoch {current_epoch}/{maximum_epochs}"
+                ),
+            )
+            log_path = (
+                latest_status_path.parent.parent
+                / f"{latest_status_path.parent.name}.log"
+            )
+            if log_path.is_file():
+                try:
+                    log_lines = log_path.read_text(
+                        encoding="utf-8", errors="replace"
+                    ).splitlines()
+                    with st.expander("Laatste trainingslog"):
+                        st.code("\n".join(log_lines[-30:]))
+                except OSError:
+                    st.caption("De trainingslog wordt momenteel bijgewerkt.")
+        else:
+            st.info("Er zijn nog geen modeltrainingen vanuit het dashboard gestart.")
 
     with learning_curve_tab:
         st.subheader("Trainingsdata tegenover validatieprestaties")

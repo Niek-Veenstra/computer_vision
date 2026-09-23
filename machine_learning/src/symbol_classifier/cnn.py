@@ -67,3 +67,14 @@ def build_cnn_v2(num_classes=14):
     )
 
     return model
+
+
+MODEL_BUILDERS = {
+    "cnn_v1": build_cnn,
+    "cnn_v2": build_cnn_v2,
+}
+
+MODEL_LABELS = {
+    "cnn_v1": "build_cnn() — CNN v1 Flatten baseline",
+    "cnn_v2": "build_cnn_v2() — CNN v2 Global average pooling",
+}

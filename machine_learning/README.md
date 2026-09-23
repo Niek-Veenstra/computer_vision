@@ -83,11 +83,31 @@ Evaluatie met `python -m symbol_classifier.assess` vereist ook `symbol_classifie
 
 ### Visueel prestatiedashboard
 
-Het Streamlit-dashboard evalueert het huidige eindmodel en toont accuracy, balanced accuracy, macro-F1, precision en recall per klasse, normaliseerbare confusion matrices voor training en validatie, de verkeerd geclassificeerde afbeeldingen en inference op een uitsnede. De dataset-tab toont de klassebalans als cirkeldiagram en tabel voor de trainingsset, validatieset of beide samen. De tab **Training runs** toont de verhouding tussen het aantal gebruikte trainingsafbeeldingen en de gemiddelde validatie-accuracy over de seeds. In de inference-tab kun je direct uit relevante projectmappen kiezen of zelf een bestand uploaden:
+Het Streamlit-dashboard evalueert een geselecteerd model en toont accuracy, balanced accuracy, macro-F1, precision en recall per klasse, normaliseerbare confusion matrices voor training en validatie, de verkeerd geclassificeerde afbeeldingen en inference op een uitsnede. De modelselector bovenaan bestuurt zowel de getoonde resultaten als inference. De dataset-tab toont de klassebalans als cirkeldiagram en tabel voor de trainingsset, validatieset of beide samen. De tab **Training runs** toont de verhouding tussen het aantal gebruikte trainingsafbeeldingen en de gemiddelde validatie-accuracy over de seeds. In de inference-tab kun je direct uit relevante projectmappen kiezen of zelf een bestand uploaden:
 
 ```powershell
 python -m streamlit run src/symbol_classifier/dashboard.py
 ```
+
+In de tab **Model trainen** kies je `build_cnn()` (CNN v1) of `build_cnn_v2()` (CNN v2), het maximale aantal epochs, de seed en de batchgrootte. De training draait als een apart lokaal Python-proces, zodat het dashboard bruikbaar blijft. Met **Status vernieuwen** zie je de actuele epoch, validatie-accuracy en trainingslog. Na voltooiing verschijnt de run in de modelselector bovenaan.
+
+Iedere dashboardtraining krijgt een eigen map onder `runs/models/<architectuur>/<tijdstip>/` met:
+
+- `best.keras`: het checkpoint met de beste validatie-accuracy;
+- `final.keras`: het model met de door early stopping herstelde beste gewichten;
+- `metadata.json`: architectuur, seed, parameters en datasetinformatie;
+- `metrics.json`: algemene metrics, confusion matrix en metrics per klasse;
+- `history.csv`: metrics per epoch;
+- `status.json`: de actuele of afgeronde trainingsstatus;
+- `tensorboard/`: TensorBoard-events.
+
+Dezelfde trainer kan ook buiten Streamlit worden gestart:
+
+```powershell
+python -m symbol_classifier.model_training --model cnn_v2 --epochs 25 --seed 42
+```
+
+De dashboardtraining overschrijft `symbol_classifier_final.keras` niet. De bestaande baseline en iedere nieuwe run blijven afzonderlijk selecteerbaar.
 
 Nieuwe trainingen schrijven daarnaast `history.csv` en TensorBoard-logs onder `runs/classifier/<tijdstip>/`. Voor de curves per epoch en het volledige overzicht van alle runs gebruik je TensorBoard:
 

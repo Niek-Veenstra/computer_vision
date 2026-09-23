@@ -13,4 +13,5 @@ symbol_classifier.keras
 symbol_classifier_final.keras
 runs/classifier/
 runs/learning_curve/
+runs/models/
 

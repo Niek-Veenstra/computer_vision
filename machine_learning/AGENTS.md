@@ -7,6 +7,8 @@
 - CNN v1 has 4,289,615 parameters. About 4.2 million are in the `Flatten()` to `Dense(128)` connection.
 - `build_cnn_v2()` is an experimental alternative with convolutional blocks, batch normalization, global average pooling and 424,687 parameters.
 - CNN v2 has not been trained or evaluated yet. Never attribute CNN v1 metrics to CNN v2.
+- Dashboard-started model runs are isolated under `runs/models/<architecture>/<run-id>/` and never replace the baseline file.
+- The dashboard model selector controls metrics, confusion matrices, error examples and inference together. Always report the selected architecture and run when discussing dashboard results.
 
 ## Recorded confusion issue
 
@@ -24,6 +26,7 @@ The three full-data learning-curve runs averaged about 79% precision, 90% recall
 ## Evaluation guidance
 
 - Compare CNN variants on the same fixed validation set and use multiple seeds.
+- Use the registered model names `cnn_v1` and `cnn_v2` when starting `symbol_classifier.model_training`; do not execute arbitrary builder names supplied through the UI.
 - Report macro-F1 and balanced accuracy alongside overall accuracy.
 - Record per-class precision, recall and F1, especially for `0`, `4`, `6`, `8` and `9`.
 - Keep in mind that the current train and validation crops originate from the same two source images. These results do not establish generalization to new handwriting or photographs.
