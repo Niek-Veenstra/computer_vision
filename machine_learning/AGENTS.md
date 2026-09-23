@@ -6,7 +6,7 @@
 - The dashboard's per-class metrics and confusion matrix evaluate that local model.
 - CNN v1 has 4,289,615 parameters. About 4.2 million are in the `Flatten()` to `Dense(128)` connection.
 - `build_cnn_v2()` is an experimental alternative with convolutional blocks, batch normalization, global average pooling and 424,687 parameters.
-- CNN v2 has not been trained or evaluated yet. Never attribute CNN v1 metrics to CNN v2.
+- The first full CNN v2 run is `runs/models/cnn_v2/20260923-113833-103317`. It failed validation and must not be treated as an improvement over CNN v1.
 - Dashboard-started model runs are isolated under `runs/models/<architecture>/<run-id>/` and never replace the baseline file.
 - The dashboard model selector controls metrics, confusion matrices, error examples and inference together. Always report the selected architecture and run when discussing dashboard results.
 
@@ -22,6 +22,12 @@ On the current 202-image validation split, CNN v1 handles class `0` as follows:
 The main zero-class problem is overprediction rather than failure to find actual zeros. Treat the `6 → 0` and `4 → 0` confusion as explicit comparison metrics in later model experiments.
 
 The three full-data learning-curve runs averaged about 79% precision, 90% recall and 84% F1 for zero. Those experiment models were not saved and did not replace `symbol_classifier_final.keras`. The same experiment produced average F1 scores of roughly 75% for `*` and 78% for `-`, based on only 5 and 10 validation images respectively.
+
+## Failed CNN v2 baseline
+
+The first full CNN v2 run used seed 42 and batch size 32. Training stopped after six epochs and restored epoch 1. Training accuracy rose from 18.7% to 56.9%, while validation accuracy remained 2.48% and validation loss rose from 2.87 to 9.49. The restored model predicts all 202 validation images as `class_0` (`*`), resulting in 6.7% balanced accuracy and 0.32% macro-F1.
+
+This train/evaluation collapse makes batch normalization the first suspected cause. Preserve this result under the existing `cnn_v2` identity. Test a new registered model variant when changing the architecture, and change one factor at a time. The first useful ablation is the same convolutional and global-pooling architecture without batch normalization.
 
 ## Evaluation guidance
 
