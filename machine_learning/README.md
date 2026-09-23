@@ -89,10 +89,10 @@ Het Streamlit-dashboard evalueert het huidige eindmodel en toont accuracy, balan
 python -m streamlit run src/symbol_classifier/dashboard.py
 ```
 
-Nieuwe trainingen schrijven daarnaast `history.csv` en TensorBoard-logs onder `runs/classifier/<tijdstip>/`. Het dashboard toont de curves van de laatste run. Voor het volledige TensorBoard-overzicht gebruik je:
+Nieuwe trainingen schrijven daarnaast `history.csv` en TensorBoard-logs onder `runs/classifier/<tijdstip>/`. In de tab **Trainingscurves** kun je zowel gewone classifier-runs als de afzonderlijke runs van een learning-curve-experiment kiezen. Voor het volledige TensorBoard-overzicht van beide typen gebruik je:
 
 ```powershell
-python -m tensorboard.main --logdir runs/classifier
+python -m tensorboard.main --logdir runs
 ```
 
 ### Learning-curve-experiment

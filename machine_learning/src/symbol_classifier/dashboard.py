@@ -164,9 +164,18 @@ def dataset_balance_figure(counts: np.ndarray, labels: list[str], title: str) ->
     return figure
 
 
-def latest_history() -> Path | None:
-    histories = sorted(RUNS_DIR.glob("*/history.csv"), key=lambda path: path.stat().st_mtime, reverse=True)
-    return histories[0] if histories else None
+def available_histories() -> list[Path]:
+    histories = list(RUNS_DIR.glob("*/history.csv"))
+    histories.extend(LEARNING_CURVE_DIR.glob("*/*/history.csv"))
+    return sorted(histories, key=lambda path: path.stat().st_mtime, reverse=True)
+
+
+def history_label(history_path: Path) -> str:
+    try:
+        relative_path = history_path.relative_to(LEARNING_CURVE_DIR)
+        return f"Learning curve / {relative_path.parent.as_posix()}"
+    except ValueError:
+        return f"Classifier / {history_path.parent.name}"
 
 
 def history_figure(history_path: Path) -> plt.Figure:
@@ -547,13 +556,18 @@ def main() -> None:
             )
 
     with training_tab:
-        history_path = latest_history()
-        if history_path:
-            st.caption(f"Laatste run: {history_path.parent.name}")
-            st.pyplot(history_figure(history_path))
+        histories = available_histories()
+        if histories:
+            history_path = st.selectbox(
+                "Trainingsrun",
+                histories,
+                format_func=history_label,
+            )
+            st.caption(f"Historie: {history_path}")
+            st.pyplot(history_figure(history_path), width="stretch")
         else:
-            st.info("Er is nog geen gelogde trainingsrun. Train opnieuw om curves te verzamelen.")
-        st.code("python -m tensorboard.main --logdir runs/classifier", language="powershell")
+            st.info("Er zijn nog geen gelogde trainingsruns.")
+        st.code("python -m tensorboard.main --logdir runs", language="powershell")
 
     st.caption(
         "De train- en validatie-uitsneden komen uit dezelfde twee bronafbeeldingen. "
