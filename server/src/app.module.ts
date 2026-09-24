@@ -10,7 +10,7 @@ import { ConfigModule } from '@nestjs/config';
 import { getDatabaseConfig } from './database.config';
 import { DocumentsModule } from './documents/documents.module';
 import { Document } from './documents/documents.entity';
-import { DocumentMarker } from './documents/document-marker.entity';
+import { DocumentMarker } from './documents/markers/document-marker.entity';
 import { Scanner } from './scanners/scanner.entity';
 import { ScannersModule } from './scanners/scanners.module';
 

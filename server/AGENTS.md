@@ -2,6 +2,7 @@
 
 - Deze backend moet een REST API zijn.
 - Ontwerp nieuwe endpoints rond resources en gebruik passende HTTP-methoden en statuscodes.
+- Modelleer een resource die uitsluitend onder een bovenliggende resource bestaat als subresource. Laat de URL-, REST- en directoryhierarchie met elkaar overeenkomen. Plaats bijvoorbeeld de code voor `/documents/:documentId/markers` in `src/documents/markers/`, inclusief de controller, service, entity, DTO's en specifieke tests, in plaats van deze bestanden vlak naast de documentresource te zetten.
 - Gebruik JSON voor request- en responsebodies, tenzij een endpoint een ander formaat nodig heeft (zoals een bestand).
 - Gebruik nergens geneste ternary-expressies. Dit is een absoluut verbod; gebruik duidelijke `if`-statements of een benoemde hulpfunctie.
 

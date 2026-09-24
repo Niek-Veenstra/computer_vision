@@ -1,7 +1,7 @@
 import {
   findDocumentMarkers,
   updateDocumentMarkerContent,
-} from './document-content';
+} from './document-marker-content';
 
 describe('document marker content operations', () => {
   const markerId = 'f45e4bf4-88ca-42b7-843d-b781698be74c';

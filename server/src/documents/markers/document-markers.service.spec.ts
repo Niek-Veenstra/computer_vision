@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { User } from '../users/users.entity';
+import { User } from '../../users/users.entity';
 import { DocumentMarker } from './document-marker.entity';
-import { Document } from './documents.entity';
-import { DocumentsService } from './documents.service';
+import { Document } from '../documents.entity';
+import { DocumentMarkersService } from './document-markers.service';
 import type { UpdateDocumentMarkerDto } from './dto/update-document-marker.dto';
 
-describe('DocumentsService.updateMarker', () => {
+describe('DocumentMarkersService.update', () => {
   const id = 'ea8fdd81-d02f-43b0-9bc3-e798a0afe052';
   const userId = '81b160a4-9768-482b-946b-f3e76588e49b';
   const markerId = 'f45e4bf4-88ca-42b7-843d-b781698be74c';
@@ -25,6 +25,8 @@ describe('DocumentsService.updateMarker', () => {
     findOneBy: jest.fn(),
     create: jest.fn((value: unknown) => value),
     save: jest.fn(),
+    findBy: jest.fn(),
+    delete: jest.fn(),
   };
   const manager = {
     getRepository: jest.fn((entity: unknown) => {
@@ -38,7 +40,7 @@ describe('DocumentsService.updateMarker', () => {
         callback(manager as unknown as EntityManager),
     ),
   };
-  const service = new DocumentsService(
+  const service = new DocumentMarkersService(
     documents as unknown as Repository<Document>,
     users as unknown as Repository<User>,
     dataSource as unknown as DataSource,
@@ -48,6 +50,7 @@ describe('DocumentsService.updateMarker', () => {
     jest.clearAllMocks();
     users.existsBy.mockResolvedValue(true);
     markers.findOneBy.mockResolvedValue(null);
+    markers.findBy.mockResolvedValue([]);
     transactionDocuments.save.mockImplementation((value: unknown) => value);
     markers.save.mockImplementation((value: unknown) => value);
     transactionDocuments.findOne.mockResolvedValue({
@@ -73,7 +76,7 @@ describe('DocumentsService.updateMarker', () => {
 
   it('updates marker content without removing the marker', async () => {
     await expect(
-      service.updateMarker(id, markerId, dto, userId, scannerId),
+      service.update(id, markerId, dto, userId, scannerId),
     ).resolves.toEqual({
       operationId,
       documentId: id,
@@ -122,7 +125,7 @@ describe('DocumentsService.updateMarker', () => {
     } as DocumentMarker);
 
     await expect(
-      service.updateMarker(id, markerId, dto, userId, scannerId),
+      service.update(id, markerId, dto, userId, scannerId),
     ).resolves.toEqual({
       operationId,
       documentId: id,
@@ -131,6 +134,36 @@ describe('DocumentsService.updateMarker', () => {
       applied: false,
     });
     expect(transactionDocuments.save).not.toHaveBeenCalled();
+  });
+
+  it('synchronizes marker creation and deletion from document content', async () => {
+    const removedMarkerId = 'c12cf6b3-117e-4ead-b414-b5e147bad13e';
+    const document = {
+      id,
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'recognitionMarker',
+            attrs: { id: markerId, label: 'Result' },
+          },
+        ],
+      },
+    } as Document;
+    markers.findBy.mockResolvedValue([
+      { id: removedMarkerId, documentId: id, label: 'Old' },
+    ]);
+
+    await service.synchronize(manager as unknown as EntityManager, document);
+
+    expect(markers.save).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: markerId,
+        documentId: id,
+        label: 'Result',
+      }),
+    ]);
+    expect(markers.delete).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a stale document version', async () => {
@@ -144,7 +177,7 @@ describe('DocumentsService.updateMarker', () => {
     });
 
     await expect(
-      service.updateMarker(id, markerId, dto, userId, scannerId),
+      service.update(id, markerId, dto, userId, scannerId),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(transactionDocuments.save).not.toHaveBeenCalled();
   });
