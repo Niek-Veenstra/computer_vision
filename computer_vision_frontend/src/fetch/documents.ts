@@ -57,7 +57,7 @@ export function updateDocument(
 
 export function getDocumentMarkers(id: string, scannerApiKey: string) {
   return useFetch(
-    `/reader/documents/${encodeURIComponent(id)}/markers`,
+    `/documents/${encodeURIComponent(id)}/markers`,
     {},
     scannerFetchOptions(scannerApiKey),
   )
@@ -72,7 +72,7 @@ export function updateDocumentMarker(
   request: DocumentMarkerUpdateRequest,
 ) {
   return useFetch(
-    `/reader/documents/${encodeURIComponent(id)}/markers/${encodeURIComponent(markerId)}`,
+    `/documents/${encodeURIComponent(id)}/markers/${encodeURIComponent(markerId)}`,
     {},
     scannerFetchOptions(scannerApiKey),
   )

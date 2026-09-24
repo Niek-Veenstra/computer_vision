@@ -55,17 +55,17 @@ target is a persistent inline Tiptap `recognitionMarker` node with a UUID,
 label and inline content. The normal document editor controls creation and
 deletion of markers.
 
-A reader authenticates with `X-Scanner-Key` and lists marker subresources
+Any registered reader authenticates with `X-Scanner-Key` and can list marker subresources
 without downloading the full document:
 
 ```http
-GET /reader/documents/{documentId}/markers
+GET /documents/{documentId}/markers
 ```
 
 It can change only the content inside an existing marker:
 
 ```http
-PATCH /reader/documents/{documentId}/markers/{markerId}
+PATCH /documents/{documentId}/markers/{markerId}
 Content-Type: application/json
 X-Scanner-Key: scn_<scanner-api-key>
 
