@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount } from 'vue'
+import { nextTick, onBeforeUnmount, ref } from 'vue'
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/vue-3'
 import Mathematics from '@tiptap/extension-mathematics'
+import { NodeSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import 'katex/dist/katex.min.css'
 import {
@@ -13,12 +14,31 @@ import {
   Undo2Icon,
   Redo2Icon,
   ScanLineIcon,
+  FileDownIcon,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { toPdf } from '@/utils/to-pdf'
 import { RecognitionMarker } from './recognition-marker'
 
-const props = defineProps<{ content: JSONContent }>()
+const props = defineProps<{ content: JSONContent; title: string }>()
 const emit = defineEmits<{ update: [content: JSONContent] }>()
+const selectedMarkerLabel = ref('')
+const hasSelectedMarker = ref(false)
+const markerLabelEditor = ref<HTMLElement | null>(null)
+
+function syncSelectedMarker() {
+  if (!editor.value?.isActive('recognitionMarker')) {
+    hasSelectedMarker.value = false
+    selectedMarkerLabel.value = ''
+    return
+  }
+
+  const label = editor.value.getAttributes('recognitionMarker').label
+  hasSelectedMarker.value = true
+  selectedMarkerLabel.value = typeof label === 'string' ? label : ''
+}
+
 const editor = useEditor({
   extensions: [
     StarterKit.configure({ link: { openOnClick: false } }),
@@ -33,19 +53,57 @@ const editor = useEditor({
       'aria-label': 'Document content',
       'aria-multiline': 'true',
     },
+    handleClickOn(view, _position, node, nodePosition) {
+      if (node.type.name !== 'recognitionMarker') return false
+      const selection = NodeSelection.create(view.state.doc, nodePosition)
+      view.dispatch(view.state.tr.setSelection(selection))
+      return true
+    },
   },
   onUpdate: ({ editor }) => emit('update', editor.getJSON()),
+  onSelectionUpdate: syncSelectedMarker,
 })
 
-function insertRecognitionMarker() {
-  editor.value
-    ?.chain()
-    .focus()
+async function insertRecognitionMarker() {
+  const currentEditor = editor.value
+  if (!currentEditor) return
+
+  const insertionPosition = currentEditor.state.selection.from
+  currentEditor
+    .chain()
     .insertContent({
       type: 'recognitionMarker',
       attrs: { id: crypto.randomUUID(), label: 'Reader target' },
     })
+    .setNodeSelection(insertionPosition)
     .run()
+
+  hasSelectedMarker.value = true
+  selectedMarkerLabel.value = 'Reader target'
+  await nextTick()
+  const input = markerLabelEditor.value?.querySelector('input')
+  input?.focus()
+  input?.select()
+}
+
+function updateSelectedMarkerLabel(value: string | number) {
+  selectedMarkerLabel.value = String(value).slice(0, 200)
+}
+
+function finishEditingMarkerLabel() {
+  const label = selectedMarkerLabel.value.trim() || 'Reader target'
+  selectedMarkerLabel.value = label
+  editor.value?.chain().updateAttributes('recognitionMarker', { label }).run()
+}
+
+function finishEditingMarkerLabelOnEnter(event: KeyboardEvent) {
+  finishEditingMarkerLabel()
+  ;(event.target as HTMLInputElement).blur()
+}
+
+async function exportToPdf() {
+  const content = editor.value?.view.dom
+  if (content) await toPdf(props.title, content)
 }
 
 onBeforeUnmount(() => editor.value?.destroy())
@@ -121,6 +179,10 @@ onBeforeUnmount(() => editor.value?.destroy())
         <ScanLineIcon />
         Reader target
       </Button>
+      <Button variant="ghost" size="sm" title="Export PDF" @click="exportToPdf">
+        <FileDownIcon />
+        Export PDF
+      </Button>
       <div class="ml-auto flex gap-1">
         <Button
           variant="ghost"
@@ -141,6 +203,25 @@ onBeforeUnmount(() => editor.value?.destroy())
           ><Redo2Icon
         /></Button>
       </div>
+      <div
+        v-if="hasSelectedMarker"
+        ref="markerLabelEditor"
+        class="flex basis-full items-center gap-2 border-t px-1 pt-2"
+      >
+        <label for="selected-marker-label" class="text-xs font-medium text-muted-foreground">
+          Target name
+        </label>
+        <Input
+          id="selected-marker-label"
+          :model-value="selectedMarkerLabel"
+          maxlength="200"
+          class="h-8 max-w-72"
+          aria-label="Target name"
+          @update:model-value="updateSelectedMarkerLabel"
+          @keydown.enter.prevent="finishEditingMarkerLabelOnEnter"
+        />
+        <Button size="sm" @click="finishEditingMarkerLabel">Save name</Button>
+      </div>
     </div>
     <EditorContent :editor="editor" />
   </div>
@@ -154,6 +235,7 @@ onBeforeUnmount(() => editor.value?.destroy())
 :deep(.document-editor .recognition-marker) {
   display: inline;
   min-width: 1rem;
+  cursor: pointer;
   border: 1px dashed color-mix(in oklab, var(--primary) 70%, transparent);
   border-radius: 0.375rem;
   background: color-mix(in oklab, var(--primary) 10%, transparent);

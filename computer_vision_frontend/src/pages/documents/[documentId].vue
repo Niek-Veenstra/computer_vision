@@ -101,6 +101,7 @@ async function reloadLatest() {
       <DocumentEditor
         :key="`${document.id}-${editorKey}`"
         :content="document.content"
+        :title="document.title"
         @update="store.update(document.id, { content: $event })"
       />
     </template>
