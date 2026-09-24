@@ -13,5 +13,6 @@ import { ScannersService } from './scanners.service';
   imports: [AuthModule, TypeOrmModule.forFeature([Scanner])],
   controllers: [ScannersController, ScannerIdentityController],
   providers: [ScannersService, ScannerApiKeyGuard],
+  exports: [ScannerApiKeyGuard],
 })
 export class ScannersModule {}

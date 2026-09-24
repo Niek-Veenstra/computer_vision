@@ -45,17 +45,49 @@ command reads connection settings from `.env`.
 The documents endpoints require `Authorization: Bearer <token>` from
 `POST /auth/authenticate`.
 
-| Method | Route | Purpose |
-| --- | --- | --- |
-| `GET` | `/documents` | List documents |
-| `GET` | `/documents/:id` | Get one document |
-| `POST` | `/documents` | Create with `title` and Tiptap `content` |
-| `PATCH` | `/documents/:id` | Update `title` and/or `content`; include the current `version` |
-| `DELETE` | `/documents/:id` | Delete a document |
+| Method   | Route            | Purpose                                                        |
+| -------- | ---------------- | -------------------------------------------------------------- |
+| `GET`    | `/documents`     | List documents                                                 |
+| `GET`    | `/documents/:id` | Get one document                                               |
+| `POST`   | `/documents`     | Create with `title` and Tiptap `content`                       |
+| `PATCH`  | `/documents/:id` | Update `title` and/or `content`; include the current `version` |
+| `DELETE` | `/documents/:id` | Delete a document                                              |
 
 Documents start at version 1. Each successful `PATCH` increments the version and
 sets `updated_by` to the authenticated user. If the supplied version is stale,
 the API returns `409 Conflict`.
+
+### Reader marker API
+
+An editor can create or remove inline Tiptap `recognitionMarker` nodes through
+the regular document API. A marker has a UUID, label and its own inline
+content. Reader clients authenticate with `X-Scanner-Key`; they may read marker
+data and update marker content, but cannot create or delete markers.
+
+| Method  | Route                                     | Purpose                                             |
+| ------- | ----------------------------------------- | --------------------------------------------------- |
+| `GET`   | `/reader/documents/:id/markers`           | Return the document version and marker subresources |
+| `PATCH` | `/reader/documents/:id/markers/:markerId` | Replace the content inside one existing marker      |
+
+Example body for setting marker content:
+
+```json
+{
+  "operationId": "1480d919-14eb-49d4-8f40-50cf5bd815c9",
+  "version": 3,
+  "content": [{ "type": "inlineMath", "value": "8-4=4" }]
+}
+```
+
+Send an empty `content` array to clear a marker while keeping the marker itself.
+The server locks the document row, checks its version, updates the nested
+content and increments the document version. Repeating the latest operation is
+idempotent. A stale version, reused operation ID with different input, or
+duplicate marker ID returns `409 Conflict`.
+
+There is intentionally no reader `POST` or `DELETE` route for markers. Marker
+existence is synchronized only when the normal document controller saves
+document content.
 
 ## Compile and run the project
 
