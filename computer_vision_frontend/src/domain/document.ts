@@ -12,5 +12,8 @@ export type PortalDocument = {
 
 export function documentText(content: JSONContent): string {
   if (content.text) return content.text
+  if (content.type === 'inlineMath' && typeof content.attrs?.latex === 'string') {
+    return content.attrs.latex
+  }
   return content.content?.map(documentText).join(' ') ?? ''
 }

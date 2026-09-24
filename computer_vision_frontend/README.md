@@ -46,3 +46,38 @@ npm run build
 ```sh
 npm run lint
 ```
+
+
+## Reader targets
+
+The document editor can insert a **Reader target** at the cursor position. Each
+target is a persistent inline Tiptap `recognitionMarker` node with a UUID,
+label and inline content. The normal document editor controls creation and
+deletion of markers.
+
+A reader authenticates with `X-Scanner-Key` and lists marker subresources
+without downloading the full document:
+
+```http
+GET /reader/documents/{documentId}/markers
+```
+
+It can change only the content inside an existing marker:
+
+```http
+PATCH /reader/documents/{documentId}/markers/{markerId}
+Content-Type: application/json
+X-Scanner-Key: scn_<scanner-api-key>
+
+{
+  "operationId": "1480d919-14eb-49d4-8f40-50cf5bd815c9",
+  "version": 3,
+  "content": [{ "type": "inlineMath", "value": "8-4=4" }]
+}
+```
+
+An empty `content` array clears the marker content without deleting the marker.
+There is no reader endpoint for creating or deleting markers. A `409 Conflict`
+means the reader must fetch the marker list again. Repeating the latest
+operation with the same `operationId` is safe. Inline math is rendered with
+KaTeX after the editor loads the latest document version.

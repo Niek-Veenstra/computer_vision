@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount } from 'vue'
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/vue-3'
+import Mathematics from '@tiptap/extension-mathematics'
 import StarterKit from '@tiptap/starter-kit'
+import 'katex/dist/katex.min.css'
 import {
   BoldIcon,
   ItalicIcon,
@@ -10,13 +12,19 @@ import {
   ListOrderedIcon,
   Undo2Icon,
   Redo2Icon,
+  ScanLineIcon,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { RecognitionMarker } from './recognition-marker'
 
 const props = defineProps<{ content: JSONContent }>()
 const emit = defineEmits<{ update: [content: JSONContent] }>()
 const editor = useEditor({
-  extensions: [StarterKit.configure({ link: { openOnClick: false } })],
+  extensions: [
+    StarterKit.configure({ link: { openOnClick: false } }),
+    Mathematics.configure({ katexOptions: { throwOnError: false } }),
+    RecognitionMarker,
+  ],
   content: props.content,
   editorProps: {
     attributes: {
@@ -28,6 +36,17 @@ const editor = useEditor({
   },
   onUpdate: ({ editor }) => emit('update', editor.getJSON()),
 })
+
+function insertRecognitionMarker() {
+  editor.value
+    ?.chain()
+    .focus()
+    .insertContent({
+      type: 'recognitionMarker',
+      attrs: { id: crypto.randomUUID(), label: 'Reader target' },
+    })
+    .run()
+}
 
 onBeforeUnmount(() => editor.value?.destroy())
 </script>
@@ -91,6 +110,17 @@ onBeforeUnmount(() => editor.value?.destroy())
         @click="editor.chain().focus().toggleOrderedList().run()"
         ><ListOrderedIcon
       /></Button>
+      <span class="mx-2 h-5 w-px bg-border" aria-hidden="true" />
+      <Button
+        variant="ghost"
+        size="sm"
+        title="Insert reader target"
+        aria-label="Insert reader target"
+        @click="insertRecognitionMarker"
+      >
+        <ScanLineIcon />
+        Reader target
+      </Button>
       <div class="ml-auto flex gap-1">
         <Button
           variant="ghost"
@@ -120,6 +150,37 @@ onBeforeUnmount(() => editor.value?.destroy())
 :deep(.document-editor) {
   overflow-wrap: anywhere;
   line-height: 1.75;
+}
+:deep(.document-editor .recognition-marker) {
+  display: inline;
+  min-width: 1rem;
+  border: 1px dashed color-mix(in oklab, var(--primary) 70%, transparent);
+  border-radius: 0.375rem;
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  padding: 0.05rem 0.35rem;
+  color: var(--primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+:deep(.document-editor .recognition-marker::before) {
+  content: attr(data-marker-label) ': ';
+  user-select: none;
+  opacity: 0.75;
+}
+:deep(.document-editor .recognition-marker:empty::after) {
+  content: 'empty';
+  user-select: none;
+  opacity: 0.55;
+}
+:deep(.document-editor .recognition-marker.ProseMirror-selectednode) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+:deep(.document-editor .tiptap-mathematics-render) {
+  padding: 0 0.15rem;
 }
 :deep(.document-editor > * + *) {
   margin-top: 1em;
