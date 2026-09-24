@@ -5,7 +5,7 @@ import { ScannersModule } from '../scanners/scanners.module';
 import { User } from '../users/users.entity';
 import { DocumentMarker } from './document-marker.entity';
 import { DocumentsController } from './documents.controller';
-import { ReaderDocumentsController } from './reader-documents.controller';
+import { DocumentMarkersController } from './document-markers.controller';
 import { Document } from './documents.entity';
 import { DocumentsService } from './documents.service';
 
@@ -15,7 +15,7 @@ import { DocumentsService } from './documents.service';
     ScannersModule,
     TypeOrmModule.forFeature([Document, DocumentMarker, User]),
   ],
-  controllers: [DocumentsController, ReaderDocumentsController],
+  controllers: [DocumentsController, DocumentMarkersController],
   providers: [DocumentsService],
 })
 export class DocumentsModule {}

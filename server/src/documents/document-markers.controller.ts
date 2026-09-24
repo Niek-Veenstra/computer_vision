@@ -17,9 +17,9 @@ import type {
 import { DocumentsService } from './documents.service';
 import { UpdateDocumentMarkerDto } from './dto/update-document-marker.dto';
 
-@Controller('reader/documents')
+@Controller('documents')
 @UseGuards(ScannerApiKeyGuard)
-export class ReaderDocumentsController {
+export class DocumentMarkersController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Get(':id/markers')

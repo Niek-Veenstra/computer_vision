@@ -61,13 +61,13 @@ the API returns `409 Conflict`.
 
 An editor can create or remove inline Tiptap `recognitionMarker` nodes through
 the regular document API. A marker has a UUID, label and its own inline
-content. Reader clients authenticate with `X-Scanner-Key`; they may read marker
+content. Any registered reader authenticates with `X-Scanner-Key`; it may read marker
 data and update marker content, but cannot create or delete markers.
 
-| Method  | Route                                     | Purpose                                             |
-| ------- | ----------------------------------------- | --------------------------------------------------- |
-| `GET`   | `/reader/documents/:id/markers`           | Return the document version and marker subresources |
-| `PATCH` | `/reader/documents/:id/markers/:markerId` | Replace the content inside one existing marker      |
+| Method  | Route                              | Purpose                                             |
+| ------- | ---------------------------------- | --------------------------------------------------- |
+| `GET`   | `/documents/:id/markers`           | Return the document version and marker subresources |
+| `PATCH` | `/documents/:id/markers/:markerId` | Replace the content inside one existing marker      |
 
 Example body for setting marker content:
 
