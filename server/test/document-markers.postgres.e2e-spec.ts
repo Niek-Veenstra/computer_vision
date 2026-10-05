@@ -1,10 +1,3 @@
-import { type INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test, type TestingModule } from '@nestjs/testing';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
 import { createHash } from 'node:crypto';
 import type { Server } from 'node:http';
 import request from 'supertest';
@@ -17,12 +10,11 @@ import { DocumentMarkersService } from '../src/documents/markers/document-marker
 import { Scanner } from '../src/scanners/scanner.entity';
 import { ScannerApiKeyGuard } from '../src/scanners/scanner-api-key.guard';
 import { ScannersService } from '../src/scanners/scanners.service';
-import { CreateUsers1726899999999 } from '../src/database/migrations/1726899999999-CreateUsers';
-import { CreateDocuments1726900000000 } from '../src/database/migrations/1726900000000-CreateDocuments';
-import { AddUserTimestamps1789992000000 } from '../src/database/migrations/1789992000000-AddUserTimestamps';
-import { CreateScanners1790000000001 } from '../src/database/migrations/1790000000001-CreateScanners';
-import { AddUserLogo1790000000002 } from '../src/database/migrations/1790000000002-AddUserLogo';
-import { CreateDocumentMarkers1790000000003 } from '../src/database/migrations/1790000000003-CreateDocumentMarkers';
+import {
+  type PostgresTestApplication,
+  startPostgresTestApplication,
+  truncateTestDatabase,
+} from './support/postgres-test-application';
 
 jest.setTimeout(180_000);
 
@@ -34,8 +26,7 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
   const secondMarkerId = 'c12cf6b3-117e-4ead-b414-b5e147bad13e';
   const apiKey = `scn_${'a'.repeat(43)}`;
 
-  let container: StartedPostgreSqlContainer;
-  let app: INestApplication;
+  let testApplication: PostgresTestApplication;
   let httpServer: Server;
   let dataSource: DataSource;
   let documents: Repository<Document>;
@@ -70,46 +61,13 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
   }
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine').start();
-
-    const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        TypeOrmModule.forRoot({
-          type: 'postgres',
-          host: container.getHost(),
-          port: container.getPort(),
-          username: container.getUsername(),
-          password: container.getPassword(),
-          database: container.getDatabase(),
-          entities: [User, Document, DocumentMarker, Scanner],
-          migrations: [
-            CreateUsers1726899999999,
-            CreateDocuments1726900000000,
-            AddUserTimestamps1789992000000,
-            CreateScanners1790000000001,
-            AddUserLogo1790000000002,
-            CreateDocumentMarkers1790000000003,
-          ],
-          migrationsRun: true,
-        }),
-        TypeOrmModule.forFeature([User, Document, DocumentMarker, Scanner]),
-      ],
+    testApplication = await startPostgresTestApplication({
       controllers: [DocumentMarkersController],
       providers: [DocumentMarkersService, ScannersService, ScannerApiKeyGuard],
-    }).compile();
+    });
 
-    app = module.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-    await app.init();
-
-    httpServer = app.getHttpServer() as Server;
-    dataSource = module.get(DataSource);
+    httpServer = testApplication.httpServer;
+    dataSource = testApplication.dataSource;
     documents = dataSource.getRepository(Document);
     markers = dataSource.getRepository(DocumentMarker);
     scanners = dataSource.getRepository(Scanner);
@@ -117,9 +75,7 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await dataSource.query(
-      'TRUNCATE TABLE "document_markers", "documents", "scanners", "user" CASCADE',
-    );
+    await truncateTestDatabase(dataSource);
 
     await users.save({
       id: ownerId,
@@ -170,8 +126,7 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await container.stop();
+    await testApplication.close();
   });
 
   it('persists an update at the addressed marker through the authenticated API', async () => {

@@ -8,10 +8,14 @@ def build_cnn(num_classes=14, learning_rate=0.001):
         layers.RandomRotation(0.05),
         layers.RandomZoom(0.001),
 
-        layers.Conv2D(16, (5, 5), activation='relu', padding='same'),
+        layers.Conv2D(16, (3, 3), activation='relu', padding='same'),
         layers.MaxPooling2D((2, 2)),
 
-        layers.Conv2D(32, (5, 5), activation='relu', padding='same'),
+        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
+        layers.MaxPooling2D((2, 2)),
+
+
+        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
         layers.MaxPooling2D((2, 2)),
 
         layers.Flatten(),

@@ -115,8 +115,10 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
-The end-to-end tests require Docker. They start an isolated PostgreSQL 16
-container, run the production migrations and remove the container afterwards.
+The end-to-end tests require Docker. Each suite starts an isolated PostgreSQL
+16 container, runs the production migrations and removes the container
+afterwards. The suites cover authentication, users, documents, scanners and
+document markers through their HTTP APIs.
 GitHub Actions runs this suite for every push and pull request. Configure the
 `Backend integration tests` check as required in a branch ruleset to block
 merges when it fails.
