@@ -115,6 +115,12 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+The end-to-end tests require Docker. They start an isolated PostgreSQL 16
+container, run the production migrations and remove the container afterwards.
+GitHub Actions runs this suite for every push and pull request. Configure the
+`Backend integration tests` check as required in a branch ruleset to block
+merges when it fails.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
