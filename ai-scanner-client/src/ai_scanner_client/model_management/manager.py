@@ -40,6 +40,9 @@ class ModelManager:
             )
         return self._registry.get(selection.model_id)
 
+    def get_bundle(self, model_id: str) -> ModelBundle:
+        return self._registry.get(model_id)
+
     def create_classifier(self, model_id: str | None = None) -> SymbolClassifier:
         bundle = self._registry.get(model_id) if model_id is not None else self.selected_bundle()
         return self._classifier_factory.create(bundle)

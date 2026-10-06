@@ -47,6 +47,15 @@ class MarkerUpdateResult(ApiModel):
     applied: bool
 
 
+class ScanSession(ApiModel):
+    id: UUID
+    document_id: UUID
+    scanner_id: UUID
+    status: str = Field(pattern="^(active|completed|cancelled)$")
+    created_at: datetime
+    completed_at: datetime | None
+
+
 class Prediction(ApiModel):
     model_id: str
     architecture: str

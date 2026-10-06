@@ -1,0 +1,99 @@
+Screen {
+    layout: vertical;
+    background: $surface;
+}
+
+#content {
+    height: 1fr;
+}
+
+#workspace {
+    height: 22;
+    min-height: 18;
+}
+
+.panel {
+    border: round $primary;
+    padding: 0 1;
+}
+
+.panel-title {
+    text-style: bold;
+    color: $accent;
+    height: 2;
+    content-align: left middle;
+}
+
+.section-title {
+    margin-top: 1;
+}
+
+#models-panel {
+    width: 3fr;
+}
+
+#details-panel {
+    width: 2fr;
+}
+
+#models-table {
+    height: 1fr;
+}
+
+.button-row {
+    height: 3;
+    align-horizontal: right;
+}
+
+.button-row Button {
+    margin-left: 1;
+}
+
+#models-status,
+#backend-status {
+    color: $text-muted;
+    min-height: 1;
+}
+
+#model-details {
+    min-height: 10;
+}
+
+#check-backend {
+    margin-bottom: 1;
+}
+
+#recording-panel {
+    height: auto;
+    min-height: 18;
+}
+
+.recording-actions {
+    align-horizontal: left;
+}
+
+#recording-status {
+    color: $text-muted;
+    min-height: 1;
+    margin-bottom: 1;
+}
+
+#markers-table {
+    height: 8;
+}
+
+#scan-marker {
+    width: 28;
+    margin-left: 1;
+}
+
+#camera-help {
+    color: $text-muted;
+    min-height: 1;
+}
+
+#recording-result {
+    color: $success;
+    text-style: bold;
+    min-height: 2;
+}

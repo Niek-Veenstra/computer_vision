@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import AnyHttpUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +19,11 @@ class ClientSettings(BaseSettings):
     models_directory: Path = Path("models")
     model_selection_path: Path = Path(".state/model-selection.json")
     request_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
+    camera_backend: Literal["picamera2", "opencv"] = "picamera2"
+    camera_device: str = "0"
+    camera_width: int = Field(default=1280, ge=128, le=8192)
+    camera_height: int = Field(default=720, ge=128, le=8192)
+    camera_warmup_seconds: float = Field(default=1.0, ge=0, le=30)
 
     def require_scanner_api_key(self) -> str:
         if self.scanner_api_key is None:

@@ -13,10 +13,14 @@ dependencies = [
     "numpy>=1.26,<2.3",
     "pillow>=11,<13",
     "pydantic-settings>=2.7,<3",
+    "textual>=8.2.8",
     "typer>=0.16,<1",
 ]
 
 [project.optional-dependencies]
+camera-opencv = [
+    "opencv-python-headless>=4.10,<5",
+]
 tensorflow = [
     "tensorflow>=2.20,<2.21",
 ]
@@ -33,6 +37,9 @@ ai-scanner-client = "ai_scanner_client.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+ai_scanner_client = ["tui/*.tcss"]
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers --strict-config"

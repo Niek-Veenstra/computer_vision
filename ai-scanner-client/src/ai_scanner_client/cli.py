@@ -83,6 +83,14 @@ def current_model() -> None:
 
 
 @cli.command()
+def tui() -> None:
+    """Open the interactive terminal user interface."""
+    from ai_scanner_client.tui.app import AiScannerTui
+
+    AiScannerTui(_settings()).run()
+
+
+@cli.command()
 def predict(
     image: Path,
     model: str | None = typer.Option(None, "--model", help="One-off model ID override."),

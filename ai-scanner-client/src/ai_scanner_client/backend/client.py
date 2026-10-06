@@ -10,6 +10,7 @@ from ai_scanner_client.models import (
     MarkerContent,
     MarkerUpdateResult,
     ScannerIdentity,
+    ScanSession,
 )
 
 
@@ -66,6 +67,23 @@ class ScannerBackendClient:
     def get_document_markers(self, document_id: UUID) -> DocumentMarkers:
         response = self._request("GET", f"/documents/{document_id}/markers")
         return DocumentMarkers.model_validate(response.json())
+
+    def get_active_scan_session(self) -> ScanSession:
+        response = self._request("GET", "/scanner-auth/scan-sessions/active")
+        return ScanSession.model_validate(response.json())
+
+    def finish_scan_session(
+        self,
+        session_id: UUID,
+        *,
+        status: str = "completed",
+    ) -> ScanSession:
+        response = self._request(
+            "PATCH",
+            f"/scanner-auth/scan-sessions/{session_id}",
+            json={"status": status},
+        )
+        return ScanSession.model_validate(response.json())
 
     def update_marker(
         self,
