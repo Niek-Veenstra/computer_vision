@@ -83,6 +83,7 @@ class KerasSymbolClassifier:
         if not path.is_file():
             raise FileNotFoundError(f"Keras model does not exist: {path}")
         os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+        os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
         try:
             import keras
         except ImportError as error:

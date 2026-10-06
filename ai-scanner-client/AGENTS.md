@@ -13,4 +13,6 @@
 - Keep each model, class mapping, and manifest together in one direct child of `models/`.
 - Never automatically select the newest discovered model. Selection must be explicit and persistent.
 - Include model ID, architecture, and run ID in inference results.
+- Keep Textual event handlers thin and delegate model and backend work to existing services.
+- Run model hashing, model loading, inference, and HTTP calls in Textual workers, not the UI loop.
 - Add tests for API contracts and inference preprocessing when behavior changes.
