@@ -25,7 +25,10 @@ export class ScanSessionsService {
     scannerId: string,
     userId: string,
   ): Promise<ScanSession> {
-    const document = await this.documents.findOneBy({ id: documentId });
+    const document = await this.documents.findOneBy({
+      id: documentId,
+      ownerId: userId,
+    });
     if (!document) throw new NotFoundException('Document not found');
 
     const scanner = await this.scanners.findOneBy({
@@ -58,7 +61,10 @@ export class ScanSessionsService {
     documentId: string,
     userId: string,
   ): Promise<ScanSession[]> {
-    const document = await this.documents.findOneBy({ id: documentId });
+    const document = await this.documents.findOneBy({
+      id: documentId,
+      ownerId: userId,
+    });
     if (!document) throw new NotFoundException('Document not found');
 
     return this.sessions.find({

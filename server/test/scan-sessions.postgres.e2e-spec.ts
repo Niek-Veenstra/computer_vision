@@ -85,6 +85,7 @@ describe('Document scan sessions API with PostgreSQL (e2e)', () => {
     document = await documents.save({
       title: 'Document with scanning',
       content: { type: 'doc' },
+      ownerId: userId,
       updatedById: userId,
     });
     scanner = await scanners.save({
@@ -190,8 +191,7 @@ describe('Document scan sessions API with PostgreSQL (e2e)', () => {
     await request(httpServer)
       .get(`/documents/${document.id}/scan-sessions`)
       .set('Authorization', `Bearer ${otherToken}`)
-      .expect(200)
-      .expect([]);
+      .expect(404);
     await request(httpServer)
       .patch(`/documents/${document.id}/scan-sessions/${started.id}`)
       .set('Authorization', `Bearer ${otherToken}`)

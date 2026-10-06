@@ -20,6 +20,7 @@ type DocumentResponse = {
   title: string;
   content: object;
   version: number;
+  ownerId: string;
   updatedById: string;
 };
 
@@ -28,6 +29,7 @@ jest.setTimeout(180_000);
 describe('Documents API with PostgreSQL (e2e)', () => {
   const jwtSecret = 'documents-integration-test-secret';
   const userId = '81b160a4-9768-482b-946b-f3e76588e49b';
+  const otherUserId = '1fcf3646-26ec-45f4-aaf5-d871980ddf99';
   const firstMarkerId = 'f45e4bf4-88ca-42b7-843d-b781698be74c';
   const secondMarkerId = 'c12cf6b3-117e-4ead-b414-b5e147bad13e';
 
@@ -38,6 +40,7 @@ describe('Documents API with PostgreSQL (e2e)', () => {
   let markers: Repository<DocumentMarker>;
   let users: Repository<User>;
   let token: string;
+  let otherToken: string;
 
   function documentResponse(body: unknown): DocumentResponse {
     return body as DocumentResponse;
@@ -87,22 +90,33 @@ describe('Documents API with PostgreSQL (e2e)', () => {
     markers = dataSource.getRepository(DocumentMarker);
     users = dataSource.getRepository(User);
 
-    token = await testApplication.module
-      .get(JwtService)
-      .signAsync({ sub: userId });
+    const jwt = testApplication.module.get(JwtService);
+    token = await jwt.signAsync({ sub: userId });
+    otherToken = await jwt.signAsync({ sub: otherUserId });
   });
 
   beforeEach(async () => {
     await truncateTestDatabase(dataSource);
-    await users.save({
-      id: userId,
-      email: 'editor@example.com',
-      password: 'not-used-by-this-test',
-      firstName: 'Document',
-      lastName: 'Editor',
-      birthDate: '1990-05-20',
-      logoDataUrl: null,
-    });
+    await users.save([
+      {
+        id: userId,
+        email: 'editor@example.com',
+        password: 'not-used-by-this-test',
+        firstName: 'Document',
+        lastName: 'Editor',
+        birthDate: '1990-05-20',
+        logoDataUrl: null,
+      },
+      {
+        id: otherUserId,
+        email: 'other-editor@example.com',
+        password: 'not-used-by-this-test',
+        firstName: 'Other',
+        lastName: 'Editor',
+        birthDate: '1991-06-21',
+        logoDataUrl: null,
+      },
+    ]);
   });
 
   afterAll(async () => {
@@ -116,6 +130,7 @@ describe('Documents API with PostgreSQL (e2e)', () => {
       title: 'Test document',
       content: contentWithMarker(),
       version: 1,
+      ownerId: userId,
       updatedById: userId,
     });
     const storedDocument = await documents.findOneByOrFail({ id: created.id });
@@ -179,6 +194,32 @@ describe('Documents API with PostgreSQL (e2e)', () => {
       .get('/documents/7820da33-b244-48fb-8d1f-4f2fb14fe790')
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
+  });
+
+  it('does not expose one users documents to another user', async () => {
+    const created = await createDocument();
+
+    await request(httpServer)
+      .get('/documents')
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(200)
+      .expect([]);
+    await request(httpServer)
+      .get(`/documents/${created.id}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(404);
+    await request(httpServer)
+      .patch(`/documents/${created.id}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({ version: 1, title: 'Unauthorized edit' })
+      .expect(404);
+    await request(httpServer)
+      .delete(`/documents/${created.id}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(404);
+    await expect(
+      documents.findOneBy({ id: created.id }),
+    ).resolves.not.toBeNull();
   });
 
   it('updates content, increments the version and synchronizes marker rows', async () => {

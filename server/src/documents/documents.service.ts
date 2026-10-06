@@ -24,12 +24,15 @@ export class DocumentsService {
     private readonly documentMarkers: DocumentMarkersService,
   ) {}
 
-  findAll(): Promise<Document[]> {
-    return this.documents.find({ order: { updatedAt: 'DESC' } });
+  findAll(userId: string): Promise<Document[]> {
+    return this.documents.find({
+      where: { ownerId: userId },
+      order: { updatedAt: 'DESC' },
+    });
   }
 
-  async findOne(id: string): Promise<Document> {
-    const document = await this.documents.findOneBy({ id });
+  async findOne(id: string, userId: string): Promise<Document> {
+    const document = await this.documents.findOneBy({ id, ownerId: userId });
     if (!document) throw new NotFoundException('Document not found');
     return document;
   }
@@ -42,6 +45,7 @@ export class DocumentsService {
         documents.create({
           title: dto.title,
           content: dto.content,
+          ownerId: userId,
           updatedById: userId,
         }),
       );
@@ -63,7 +67,7 @@ export class DocumentsService {
     return this.dataSource.transaction(async (manager) => {
       const documents = manager.getRepository(Document);
       const result = await documents.update(
-        { id, version: dto.version },
+        { id, ownerId: userId, version: dto.version },
         {
           ...(dto.title !== undefined && { title: dto.title }),
           ...(dto.content !== undefined && { content: dto.content }),
@@ -72,12 +76,12 @@ export class DocumentsService {
         },
       );
       if (!result.affected) {
-        const current = await documents.findOneBy({ id });
+        const current = await documents.findOneBy({ id, ownerId: userId });
         if (!current) throw new NotFoundException('Document not found');
         throw new ConflictException('Document version is outdated');
       }
 
-      const document = await documents.findOneBy({ id });
+      const document = await documents.findOneBy({ id, ownerId: userId });
       if (!document) throw new NotFoundException('Document not found');
       if (dto.content !== undefined) {
         await this.documentMarkers.synchronize(manager, document);
@@ -86,8 +90,8 @@ export class DocumentsService {
     });
   }
 
-  async remove(id: string): Promise<void> {
-    const result = await this.documents.delete(id);
+  async remove(id: string, userId: string): Promise<void> {
+    const result = await this.documents.delete({ id, ownerId: userId });
     if (!result.affected) throw new NotFoundException('Document not found');
   }
 

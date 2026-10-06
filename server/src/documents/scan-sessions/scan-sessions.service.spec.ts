@@ -43,6 +43,10 @@ describe('ScanSessionsService', () => {
       createdById: userId,
       status: ScanSessionStatus.Active,
     });
+    expect(documents.findOneBy).toHaveBeenCalledWith({
+      id: documentId,
+      ownerId: userId,
+    });
     expect(scanners.findOneBy).toHaveBeenCalledWith(
       expect.objectContaining({ id: scannerId, ownerId: userId }),
     );
@@ -63,6 +67,10 @@ describe('ScanSessionsService', () => {
     await expect(
       service.findAllForDocument(documentId, userId),
     ).resolves.toEqual(expected);
+    expect(documents.findOneBy).toHaveBeenCalledWith({
+      id: documentId,
+      ownerId: userId,
+    });
     expect(sessions.find).toHaveBeenCalledWith({
       where: { documentId, createdById: userId },
       order: { createdAt: 'DESC' },

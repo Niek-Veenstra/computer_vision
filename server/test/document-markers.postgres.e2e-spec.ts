@@ -111,6 +111,7 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
       title: 'Marker positions',
       content: initialContent(),
       version: 7,
+      ownerId,
       updatedById: ownerId,
     });
     await sessions.save({

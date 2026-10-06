@@ -13,6 +13,7 @@ import { CreateScanners1790000000001 } from './database/migrations/1790000000001
 import { AddUserLogo1790000000002 } from './database/migrations/1790000000002-AddUserLogo';
 import { CreateDocumentMarkers1790000000003 } from './database/migrations/1790000000003-CreateDocumentMarkers';
 import { CreateScanSessions1790000000004 } from './database/migrations/1790000000004-CreateScanSessions';
+import { AddDocumentOwnership1790000000005 } from './database/migrations/1790000000005-AddDocumentOwnership';
 
 export const AppDataSource = new DataSource({
   ...getDatabaseConfig(process.env),
@@ -25,5 +26,6 @@ export const AppDataSource = new DataSource({
     AddUserLogo1790000000002,
     CreateDocumentMarkers1790000000003,
     CreateScanSessions1790000000004,
+    AddDocumentOwnership1790000000005,
   ],
 });

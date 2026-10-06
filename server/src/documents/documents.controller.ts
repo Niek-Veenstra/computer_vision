@@ -25,13 +25,16 @@ export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   @Get()
-  findAll(): Promise<Document[]> {
-    return this.documentsService.findAll();
+  findAll(@Req() request: AuthenticatedRequest): Promise<Document[]> {
+    return this.documentsService.findAll(request.userId);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Document> {
-    return this.documentsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<Document> {
+    return this.documentsService.findOne(id, request.userId);
   }
 
   @Post()
@@ -53,7 +56,10 @@ export class DocumentsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.documentsService.remove(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<void> {
+    return this.documentsService.remove(id, request.userId);
   }
 }

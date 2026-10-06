@@ -29,6 +29,13 @@ export class Document {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
+  @Column({ name: 'owner_id', type: 'uuid' })
+  ownerId: string;
+
+  @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'owner_id' })
+  owner: User;
+
   @Column({ name: 'updated_by', type: 'uuid' })
   updatedById: string;
 

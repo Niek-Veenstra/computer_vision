@@ -15,6 +15,7 @@ import { CreateScanners1790000000001 } from '../../src/database/migrations/17900
 import { AddUserLogo1790000000002 } from '../../src/database/migrations/1790000000002-AddUserLogo';
 import { CreateDocumentMarkers1790000000003 } from '../../src/database/migrations/1790000000003-CreateDocumentMarkers';
 import { CreateScanSessions1790000000004 } from '../../src/database/migrations/1790000000004-CreateScanSessions';
+import { AddDocumentOwnership1790000000005 } from '../../src/database/migrations/1790000000005-AddDocumentOwnership';
 import { Document } from '../../src/documents/documents.entity';
 import { DocumentMarker } from '../../src/documents/markers/document-marker.entity';
 import { ScanSession } from '../../src/documents/scan-sessions/scan-session.entity';
@@ -30,6 +31,7 @@ const migrations = [
   AddUserLogo1790000000002,
   CreateDocumentMarkers1790000000003,
   CreateScanSessions1790000000004,
+  AddDocumentOwnership1790000000005,
 ];
 
 type PostgresTestApplicationOptions = Pick<
