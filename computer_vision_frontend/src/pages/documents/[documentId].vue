@@ -2,21 +2,40 @@
 defineOptions({ name: 'DocumentPage' })
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeftIcon, CheckIcon, FileQuestionIcon } from 'lucide-vue-next'
+import { ArrowLeftIcon, CheckIcon, FileQuestionIcon, ScanLineIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { ScanSession } from '@/domain/scan-session'
+import { createScanSession } from '@/fetch/scan-sessions'
 import { useDocumentsStore } from '@/stores/documents'
+import { useScannersStore } from '@/stores/scanners'
 import DocumentEditor from '@/ui/documents/DocumentEditor.vue'
 
 const route = useRoute('document')
 const store = useDocumentsStore()
+const scannersStore = useScannersStore()
 const document = computed(() => store.documents.find((item) => item.id === route.params.documentId))
 const title = ref(document.value?.title ?? '')
 const loadingDocument = ref(!document.value)
 const editorKey = ref(0)
+const selectedScannerId = ref('')
+const startingSession = ref(false)
+const sessionError = ref('')
+const activeSession = ref<ScanSession | null>(null)
+
+const availableScanners = computed(() =>
+  scannersStore.scanners.filter((scanner) => scanner.revokedAt === null),
+)
 
 onMounted(async () => {
-  const loaded = await store.loadOne(route.params.documentId)
+  const [loaded] = await Promise.all([
+    store.loadOne(route.params.documentId),
+    scannersStore.load(),
+  ])
   if (loaded) title.value = loaded.title
+  if (availableScanners.value.length === 1) {
+    selectedScannerId.value = availableScanners.value[0]?.id ?? ''
+  }
   loadingDocument.value = false
 })
 
@@ -32,6 +51,25 @@ async function reloadLatest() {
   if (latest) {
     title.value = latest.title
     editorKey.value += 1
+  }
+}
+
+async function startScanSession() {
+  if (!document.value || !selectedScannerId.value || startingSession.value) return
+  startingSession.value = true
+  sessionError.value = ''
+  activeSession.value = null
+  try {
+    await store.saveNow(document.value.id)
+    const request = createScanSession(document.value.id, selectedScannerId.value)
+    await request.execute()
+    if (request.error.value) throw request.error.value
+    if (!request.data.value) throw new Error('The scan-session response was empty.')
+    activeSession.value = request.data.value
+  } catch (error) {
+    sessionError.value = error instanceof Error ? error.message : 'Could not start the scan session.'
+  } finally {
+    startingSession.value = false
   }
 }
 </script>
@@ -87,6 +125,58 @@ async function reloadLatest() {
           >Discard local edits and reload</Button
         >
       </div>
+      <section
+        aria-labelledby="scan-session-heading"
+        class="rounded-xl border bg-card p-4 shadow-xs sm:p-5"
+      >
+        <div class="flex items-start gap-3">
+          <ScanLineIcon class="mt-0.5 size-5 text-muted-foreground" aria-hidden="true" />
+          <div class="min-w-0 flex-1">
+            <h2 id="scan-session-heading" class="font-semibold">Scan this document</h2>
+            <p class="mt-1 text-sm text-muted-foreground">
+              Assign this document to a scanner. The scanner can access its markers until the
+              session is completed.
+            </p>
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Select v-model="selectedScannerId" :disabled="startingSession">
+                <SelectTrigger class="w-full sm:w-72" aria-label="Scanner">
+                  <SelectValue placeholder="Select a scanner" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="scanner in availableScanners"
+                    :key="scanner.id"
+                    :value="scanner.id"
+                  >
+                    {{ scanner.name }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                :disabled="!selectedScannerId || startingSession || !!activeSession"
+                @click="startScanSession"
+              >
+                {{ startingSession ? 'Starting session...' : 'Start scan session' }}
+              </Button>
+            </div>
+            <p v-if="scannersStore.loadError" class="mt-3 text-sm text-destructive" role="alert">
+              {{ scannersStore.loadError }}
+            </p>
+            <p v-else-if="sessionError" class="mt-3 text-sm text-destructive" role="alert">
+              {{ sessionError }}
+            </p>
+            <p v-else-if="activeSession" class="mt-3 text-sm text-emerald-600" role="status">
+              Session started. Open the scanner TUI and choose Start session.
+            </p>
+            <p
+              v-else-if="!scannersStore.loading && !availableScanners.length"
+              class="mt-3 text-sm text-muted-foreground"
+            >
+              Create an active scanner before starting a session.
+            </p>
+          </div>
+        </div>
+      </section>
       <h1>
         <input
           :value="title"
