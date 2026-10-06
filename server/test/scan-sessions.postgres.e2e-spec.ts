@@ -150,6 +150,35 @@ describe('Document scan sessions API with PostgreSQL (e2e)', () => {
       .expect(201);
   });
 
+  it('deletes completed sessions without deleting the document', async () => {
+    const startResponse = await request(httpServer)
+      .post(`/documents/${document.id}/scan-sessions`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ scannerId: scanner.id })
+      .expect(201);
+    const started = startResponse.body as unknown as ScanSessionResponse;
+
+    await request(httpServer)
+      .delete(`/documents/${document.id}/scan-sessions/${started.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(409);
+    await request(httpServer)
+      .patch(`/documents/${document.id}/scan-sessions/${started.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: ScanSessionStatus.Completed })
+      .expect(200);
+    await request(httpServer)
+      .delete(`/documents/${document.id}/scan-sessions/${started.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+    await request(httpServer)
+      .get(`/documents/${document.id}/scan-sessions`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect([]);
+    await expect(documents.existsBy({ id: document.id })).resolves.toBe(true);
+  });
+
   it('only exposes and stops sessions created by the current user', async () => {
     const startResponse = await request(httpServer)
       .post(`/documents/${document.id}/scan-sessions`)

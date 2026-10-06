@@ -17,6 +17,7 @@ describe('ScanSessionsService', () => {
     existsBy: jest.fn(),
     create: jest.fn((value: object) => value),
     save: jest.fn((value: object) => value),
+    delete: jest.fn(),
   };
   const documents = { findOneBy: jest.fn() };
   const scanners = { findOneBy: jest.fn() };
@@ -110,6 +111,47 @@ describe('ScanSessionsService', () => {
     await expect(
       service.stop(documentId, sessionId, userId, ScanSessionStatus.Completed),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('deletes a completed session created by the user', async () => {
+    sessions.findOneBy.mockResolvedValue({
+      id: sessionId,
+      documentId,
+      createdById: userId,
+      status: ScanSessionStatus.Completed,
+    });
+    sessions.delete.mockResolvedValue({ affected: 1 });
+
+    await service.remove(documentId, sessionId, userId);
+
+    expect(sessions.delete).toHaveBeenCalledWith({
+      id: sessionId,
+      documentId,
+      createdById: userId,
+    });
+  });
+
+  it('does not delete an active session', async () => {
+    sessions.findOneBy.mockResolvedValue({
+      id: sessionId,
+      documentId,
+      createdById: userId,
+      status: ScanSessionStatus.Active,
+    });
+
+    await expect(
+      service.remove(documentId, sessionId, userId),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(sessions.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a session owned by another user', async () => {
+    sessions.findOneBy.mockResolvedValue(null);
+
+    await expect(
+      service.remove(documentId, sessionId, userId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(sessions.delete).not.toHaveBeenCalled();
   });
 
   it('requires an active session for marker access', async () => {

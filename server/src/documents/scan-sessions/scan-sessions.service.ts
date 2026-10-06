@@ -86,6 +86,31 @@ export class ScanSessionsService {
     return this.sessions.save(session);
   }
 
+  async remove(
+    documentId: string,
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const session = await this.sessions.findOneBy({
+      id: sessionId,
+      documentId,
+      createdById: userId,
+    });
+    if (!session) throw new NotFoundException('Scan session not found');
+    if (session.status === ScanSessionStatus.Active) {
+      throw new ConflictException('Active scan sessions cannot be deleted');
+    }
+
+    const deleted = await this.sessions.delete({
+      id: sessionId,
+      documentId,
+      createdById: userId,
+    });
+    if (deleted.affected !== 1) {
+      throw new NotFoundException('Scan session not found');
+    }
+  }
+
   async findActiveForScanner(scannerId: string): Promise<ScanSession> {
     const session = await this.sessions.findOneBy({
       scannerId,

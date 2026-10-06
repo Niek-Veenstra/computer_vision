@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -58,6 +61,16 @@ export class DocumentScanSessionsController {
       request.userId,
       dto.status,
     );
+  }
+
+  @Delete(':sessionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<void> {
+    return this.sessions.remove(documentId, sessionId, request.userId);
   }
 }
 
