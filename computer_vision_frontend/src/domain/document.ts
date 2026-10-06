@@ -5,6 +5,7 @@ export type PortalDocument = {
   title: string
   content: JSONContent
   version: number
+  ownerId: string
   createdAt: string
   updatedAt: string
   updatedById: string
