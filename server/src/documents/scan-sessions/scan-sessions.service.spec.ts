@@ -13,6 +13,7 @@ describe('ScanSessionsService', () => {
 
   const sessions = {
     findOneBy: jest.fn(),
+    find: jest.fn(),
     existsBy: jest.fn(),
     create: jest.fn((value: object) => value),
     save: jest.fn((value: object) => value),
@@ -52,6 +53,63 @@ describe('ScanSessionsService', () => {
     await expect(
       service.create(documentId, scannerId, userId),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('lists the current users scan sessions for a document', async () => {
+    const expected = [{ id: sessionId, documentId, createdById: userId }];
+    sessions.find.mockResolvedValue(expected);
+
+    await expect(
+      service.findAllForDocument(documentId, userId),
+    ).resolves.toEqual(expected);
+    expect(sessions.find).toHaveBeenCalledWith({
+      where: { documentId, createdById: userId },
+      order: { createdAt: 'DESC' },
+    });
+  });
+
+  it('rejects listing sessions for a missing document', async () => {
+    documents.findOneBy.mockResolvedValue(null);
+
+    await expect(
+      service.findAllForDocument(documentId, userId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('stops an active session created by the user', async () => {
+    const active = {
+      id: sessionId,
+      documentId,
+      scannerId,
+      createdById: userId,
+      status: ScanSessionStatus.Active,
+      completedAt: null,
+    };
+    sessions.findOneBy.mockResolvedValue(active);
+
+    const result = await service.stop(
+      documentId,
+      sessionId,
+      userId,
+      ScanSessionStatus.Completed,
+    );
+
+    expect(sessions.findOneBy).toHaveBeenCalledWith({
+      id: sessionId,
+      documentId,
+      createdById: userId,
+      status: ScanSessionStatus.Active,
+    });
+    expect(result.status).toBe(ScanSessionStatus.Completed);
+    expect(result.completedAt).toBeInstanceOf(Date);
+  });
+
+  it('does not stop a session that is not active and owned by the user', async () => {
+    sessions.findOneBy.mockResolvedValue(null);
+
+    await expect(
+      service.stop(documentId, sessionId, userId, ScanSessionStatus.Completed),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('requires an active session for marker access', async () => {

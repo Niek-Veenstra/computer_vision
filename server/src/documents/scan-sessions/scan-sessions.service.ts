@@ -54,6 +54,38 @@ export class ScanSessionsService {
     );
   }
 
+  async findAllForDocument(
+    documentId: string,
+    userId: string,
+  ): Promise<ScanSession[]> {
+    const document = await this.documents.findOneBy({ id: documentId });
+    if (!document) throw new NotFoundException('Document not found');
+
+    return this.sessions.find({
+      where: { documentId, createdById: userId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async stop(
+    documentId: string,
+    sessionId: string,
+    userId: string,
+    status: ScanSessionStatus.Completed,
+  ): Promise<ScanSession> {
+    const session = await this.sessions.findOneBy({
+      id: sessionId,
+      documentId,
+      createdById: userId,
+      status: ScanSessionStatus.Active,
+    });
+    if (!session) throw new NotFoundException('Active scan session not found');
+
+    session.status = status;
+    session.completedAt = new Date();
+    return this.sessions.save(session);
+  }
+
   async findActiveForScanner(scannerId: string): Promise<ScanSession> {
     const session = await this.sessions.findOneBy({
       scannerId,

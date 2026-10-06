@@ -19,6 +19,7 @@ import {
 } from '../../scanners/scanner-api-key.guard';
 import { CreateScanSessionDto } from './dto/create-scan-session.dto';
 import { FinishScanSessionDto } from './dto/finish-scan-session.dto';
+import { StopScanSessionDto } from './dto/stop-scan-session.dto';
 import { ScanSession } from './scan-session.entity';
 import { ScanSessionsService } from './scan-sessions.service';
 
@@ -27,6 +28,14 @@ import { ScanSessionsService } from './scan-sessions.service';
 export class DocumentScanSessionsController {
   constructor(private readonly sessions: ScanSessionsService) {}
 
+  @Get()
+  findAll(
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ScanSession[]> {
+    return this.sessions.findAllForDocument(documentId, request.userId);
+  }
+
   @Post()
   create(
     @Param('documentId', ParseUUIDPipe) documentId: string,
@@ -34,6 +43,21 @@ export class DocumentScanSessionsController {
     @Req() request: AuthenticatedRequest,
   ): Promise<ScanSession> {
     return this.sessions.create(documentId, dto.scannerId, request.userId);
+  }
+
+  @Patch(':sessionId')
+  stop(
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() dto: StopScanSessionDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ScanSession> {
+    return this.sessions.stop(
+      documentId,
+      sessionId,
+      request.userId,
+      dto.status,
+    );
   }
 }
 
