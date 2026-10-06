@@ -1,18 +1,28 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { UsersController } from './users.controller';
+import { UsersService } from './users.service';
 
 describe('UsersController', () => {
-  let controller: UsersController;
+  const findAllPublic = jest.fn();
+  const usersService = { findAllPublic } as unknown as UsersService;
+  const controller = new UsersController(usersService);
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [UsersController],
-    }).compile();
-
-    controller = module.get<UsersController>(UsersController);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+  it('returns the public users from the service', async () => {
+    const users = [
+      {
+        id: '81b160a4-9768-482b-946b-f3e76588e49b',
+        email: 'user@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        birthDate: '2000-01-01',
+      },
+    ];
+    findAllPublic.mockResolvedValue(users);
+
+    await expect(controller.findAll()).resolves.toEqual(users);
+    expect(findAllPublic).toHaveBeenCalledTimes(1);
   });
 });

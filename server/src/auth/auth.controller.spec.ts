@@ -1,18 +1,28 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
 
 describe('AuthController', () => {
-  let controller: AuthController;
+  const authenticate = jest.fn();
+  const authService = { authenticate } as unknown as AuthService;
+  const controller = new AuthController(authService);
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AuthController],
-    }).compile();
-
-    controller = module.get<AuthController>(AuthController);
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+  it('authenticates with the submitted credentials', async () => {
+    const credentials = {
+      email: 'user@example.com',
+      password: 'secret-password',
+    };
+    authenticate.mockResolvedValue({ token: 'signed-token' });
+
+    await expect(controller.authenticate(credentials)).resolves.toEqual({
+      token: 'signed-token',
+    });
+    expect(authenticate).toHaveBeenCalledWith(
+      credentials.email,
+      credentials.password,
+    );
   });
 });
