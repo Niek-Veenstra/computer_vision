@@ -41,3 +41,11 @@ export function stopScanSession(documentId: string, sessionId: string) {
     .patch({ status: 'completed' })
     .json<ScanSession>()
 }
+
+export function deleteScanSession(documentId: string, sessionId: string) {
+  return useFetch(
+    `/documents/${encodeURIComponent(documentId)}/scan-sessions/${encodeURIComponent(sessionId)}`,
+    {},
+    authenticatedFetchOptions,
+  ).delete()
+}

@@ -8,12 +8,18 @@ import {
   FileQuestionIcon,
   ScanLineIcon,
   SquareIcon,
+  Trash2Icon,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { ScanSession } from '@/domain/scan-session'
-import { createScanSession, listScanSessions, stopScanSession } from '@/fetch/scan-sessions'
+import {
+  createScanSession,
+  deleteScanSession,
+  listScanSessions,
+  stopScanSession,
+} from '@/fetch/scan-sessions'
 import { useDocumentsStore } from '@/stores/documents'
 import { useScannersStore } from '@/stores/scanners'
 import DocumentEditor from '@/ui/documents/DocumentEditor.vue'
@@ -30,6 +36,8 @@ const selectedScannerId = ref('')
 const startingSession = ref(false)
 const loadingSessions = ref(true)
 const stoppingSessionId = ref<string | null>(null)
+const confirmingDeleteSessionId = ref<string | null>(null)
+const deletingSessionId = ref<string | null>(null)
 const sessionError = ref('')
 const scanSessions = ref<ScanSession[]>([])
 
@@ -147,6 +155,31 @@ async function stopActiveScanSession() {
     sessionError.value = sessionErrorMessage(error, 'Could not stop the scan session.')
   } finally {
     stoppingSessionId.value = null
+  }
+}
+
+async function deleteCompletedScanSession(session: ScanSession) {
+  if (
+    !document.value ||
+    session.status === 'active' ||
+    confirmingDeleteSessionId.value !== session.id ||
+    deletingSessionId.value
+  ) {
+    return
+  }
+
+  deletingSessionId.value = session.id
+  sessionError.value = ''
+  try {
+    const request = deleteScanSession(document.value.id, session.id)
+    await request.execute()
+    if (request.error.value) throw request.error.value
+    scanSessions.value = scanSessions.value.filter((item) => item.id !== session.id)
+    confirmingDeleteSessionId.value = null
+  } catch (error) {
+    sessionError.value = sessionErrorMessage(error, 'Could not delete the scan session.')
+  } finally {
+    deletingSessionId.value = null
   }
 }
 </script>
@@ -335,7 +368,8 @@ async function stopActiveScanSession() {
             <div>
               <h2 id="session-history-heading" class="font-semibold">Session history</h2>
               <p class="mt-1 text-sm text-muted-foreground">
-                Scan sessions started for this document.
+                Scan sessions started for this document. Deleting a session keeps results
+                already written to the document.
               </p>
             </div>
             <Button
@@ -368,16 +402,53 @@ async function stopActiveScanSession() {
                   </span>
                 </p>
               </div>
-              <span
-                class="w-fit rounded-full border px-2 py-0.5 text-xs font-medium"
-                :class="{
-                  'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400':
-                    session.status === 'active',
-                  'border-border bg-muted text-muted-foreground': session.status !== 'active',
-                }"
-              >
-                {{ sessionStatusLabel(session.status) }}
-              </span>
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  class="w-fit rounded-full border px-2 py-0.5 text-xs font-medium"
+                  :class="{
+                    'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400':
+                      session.status === 'active',
+                    'border-border bg-muted text-muted-foreground': session.status !== 'active',
+                  }"
+                >
+                  {{ sessionStatusLabel(session.status) }}
+                </span>
+                <template v-if="session.status !== 'active'">
+                  <div
+                    v-if="confirmingDeleteSessionId === session.id"
+                    class="flex items-center gap-2"
+                  >
+                    <span class="text-xs text-muted-foreground">Delete this session?</span>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      :disabled="!!deletingSessionId"
+                      @click="deleteCompletedScanSession(session)"
+                    >
+                      {{ deletingSessionId === session.id ? 'Deleting...' : 'Delete' }}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      :disabled="!!deletingSessionId"
+                      @click="confirmingDeleteSessionId = null"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <Button
+                    v-else
+                    variant="ghost"
+                    size="icon-sm"
+                    :disabled="!!deletingSessionId"
+                    :aria-label="`Delete scan session from ${formatDateTime(session.createdAt)}`"
+                    title="Delete scan session"
+                    @click="confirmingDeleteSessionId = session.id"
+                  >
+                    <Trash2Icon aria-hidden="true" />
+                  </Button>
+                </template>
+              </div>
             </li>
           </ul>
         </section>
