@@ -9,6 +9,7 @@ import { AuthController } from './auth/auth.controller';
 import { ConfigModule } from '@nestjs/config';
 import { getDatabaseConfig } from './database.config';
 import { DocumentsModule } from './documents/documents.module';
+import { ScanSession } from './documents/scan-sessions/scan-session.entity';
 import { Document } from './documents/documents.entity';
 import { DocumentMarker } from './documents/markers/document-marker.entity';
 import { Scanner } from './scanners/scanner.entity';
@@ -26,7 +27,7 @@ import { ScannersModule } from './scanners/scanners.module';
     TypeOrmModule.forRootAsync({
       useFactory: () => ({
         ...getDatabaseConfig(process.env),
-        entities: [User, Document, DocumentMarker, Scanner],
+        entities: [User, Document, DocumentMarker, ScanSession, Scanner],
       }),
     }),
   ],

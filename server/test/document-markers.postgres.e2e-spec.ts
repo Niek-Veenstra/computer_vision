@@ -7,6 +7,11 @@ import { Document } from '../src/documents/documents.entity';
 import { DocumentMarker } from '../src/documents/markers/document-marker.entity';
 import { DocumentMarkersController } from '../src/documents/markers/document-markers.controller';
 import { DocumentMarkersService } from '../src/documents/markers/document-markers.service';
+import {
+  ScanSession,
+  ScanSessionStatus,
+} from '../src/documents/scan-sessions/scan-session.entity';
+import { ScanSessionsService } from '../src/documents/scan-sessions/scan-sessions.service';
 import { Scanner } from '../src/scanners/scanner.entity';
 import { ScannerApiKeyGuard } from '../src/scanners/scanner-api-key.guard';
 import { ScannersService } from '../src/scanners/scanners.service';
@@ -32,6 +37,7 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
   let documents: Repository<Document>;
   let markers: Repository<DocumentMarker>;
   let scanners: Repository<Scanner>;
+  let sessions: Repository<ScanSession>;
   let users: Repository<User>;
 
   function initialContent(): object {
@@ -63,7 +69,12 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
   beforeAll(async () => {
     testApplication = await startPostgresTestApplication({
       controllers: [DocumentMarkersController],
-      providers: [DocumentMarkersService, ScannersService, ScannerApiKeyGuard],
+      providers: [
+        DocumentMarkersService,
+        ScanSessionsService,
+        ScannersService,
+        ScannerApiKeyGuard,
+      ],
     });
 
     httpServer = testApplication.httpServer;
@@ -71,6 +82,7 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
     documents = dataSource.getRepository(Document);
     markers = dataSource.getRepository(DocumentMarker);
     scanners = dataSource.getRepository(Scanner);
+    sessions = dataSource.getRepository(ScanSession);
     users = dataSource.getRepository(User);
   });
 
@@ -100,6 +112,13 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
       content: initialContent(),
       version: 7,
       updatedById: ownerId,
+    });
+    await sessions.save({
+      documentId,
+      scannerId,
+      createdById: ownerId,
+      status: ScanSessionStatus.Active,
+      completedAt: null,
     });
     await markers.save([
       {
@@ -381,6 +400,18 @@ describe('Document marker API with PostgreSQL (e2e)', () => {
     const storedDocument = await documents.findOneByOrFail({ id: documentId });
     expect(storedDocument.version).toBe(7);
     expect(storedDocument.content).toEqual(originalDocument.content);
+  });
+
+  it('rejects marker access after the scan session is completed', async () => {
+    await sessions.update(
+      { documentId, scannerId },
+      { status: ScanSessionStatus.Completed, completedAt: new Date() },
+    );
+
+    await request(httpServer)
+      .get(`/documents/${documentId}/markers`)
+      .set('X-Scanner-Key', apiKey)
+      .expect(404);
   });
 
   it('requires a valid scanner key', async () => {
