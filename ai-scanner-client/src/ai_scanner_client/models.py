@@ -65,6 +65,31 @@ class Prediction(ApiModel):
     class_index: int = Field(ge=0)
 
 
+class BoundingBox(ApiModel):
+    left: float = Field(ge=0)
+    top: float = Field(ge=0)
+    right: float = Field(ge=0)
+    bottom: float = Field(ge=0)
+
+
+class DetectedSymbol(ApiModel):
+    box: BoundingBox
+    detection_confidence: float = Field(ge=0.0, le=1.0)
+    prediction: Prediction
+
+
+class PagePrediction(ApiModel):
+    model_id: str
+    classifier_architecture: str
+    classifier_run_id: str
+    detector_architecture: str
+    detector_run_id: str
+    image_width: int = Field(gt=0)
+    image_height: int = Field(gt=0)
+    sequence: str | None = None
+    detections: list[DetectedSymbol]
+
+
 class RecognitionResult(ApiModel):
     prediction: Prediction
     update: MarkerUpdateResult

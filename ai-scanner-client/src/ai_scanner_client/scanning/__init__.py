@@ -1,3 +1,4 @@
+from ai_scanner_client.scanning.page import CameraPageRecognizer
 from ai_scanner_client.scanning.session import RecordingSession
 
-__all__ = ["RecordingSession"]
+__all__ = ["CameraPageRecognizer", "RecordingSession"]

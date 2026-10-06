@@ -6,12 +6,16 @@ from pydantic import BaseModel
 
 from ai_scanner_client.application import PiClientApplication
 from ai_scanner_client.backend.client import ScannerBackendClient
+from ai_scanner_client.camera.factory import CameraFactory
+from ai_scanner_client.camera.preview import GuidedCameraPreview
 from ai_scanner_client.config import ClientSettings
 from ai_scanner_client.inference.classifier import SymbolClassifier
+from ai_scanner_client.inference.pipeline import SymbolRecognitionPipeline
 from ai_scanner_client.model_management.factory import ClassifierFactory
 from ai_scanner_client.model_management.manager import ModelManager
 from ai_scanner_client.model_management.registry import ModelRegistry
 from ai_scanner_client.model_management.selection import ModelSelectionStore
+from ai_scanner_client.scanning.page import CameraPageRecognizer
 
 cli = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
 models_cli = typer.Typer(no_args_is_help=True, help="Discover and select inference models.")
@@ -34,6 +38,12 @@ def _classifier(settings: ClientSettings, model_id: str | None = None) -> Symbol
     manager = _model_manager(settings)
     manager.refresh()
     return manager.create_classifier(model_id)
+
+
+def _pipeline(settings: ClientSettings, model_id: str | None = None) -> SymbolRecognitionPipeline:
+    manager = _model_manager(settings)
+    manager.refresh()
+    return manager.create_pipeline(model_id)
 
 
 def _backend(settings: ClientSettings) -> ScannerBackendClient:
@@ -99,6 +109,52 @@ def predict(
     settings = _settings()
     application = PiClientApplication(_classifier(settings, model))
     _print_model(application.classify(image))
+
+
+@cli.command("predict-page")
+def predict_page(
+    image: Path,
+    model: str | None = typer.Option(None, "--model", help="One-off model ID override."),
+    confidence: float | None = typer.Option(
+        None,
+        "--confidence",
+        min=0.01,
+        max=1.0,
+        help="Override the detector confidence threshold from the manifest.",
+    ),
+) -> None:
+    """Detect and classify all symbols in one local page image."""
+    result = _pipeline(_settings(), model).predict(image, confidence_threshold=confidence)
+    _print_model(result)
+
+
+@cli.command("predict-camera")
+def predict_camera(
+    model: str | None = typer.Option(None, "--model", help="One-off model ID override."),
+    confidence: float | None = typer.Option(
+        None,
+        "--confidence",
+        min=0.01,
+        max=1.0,
+        help="Override the detector confidence threshold from the manifest.",
+    ),
+    preview: bool = typer.Option(
+        True,
+        "--preview/--no-preview",
+        help="Show a live camera frame with a sequence guide before capture.",
+    ),
+) -> None:
+    """Capture one Raspberry Pi camera frame and run the full symbol pipeline."""
+    settings = _settings()
+    recognizer = CameraPageRecognizer(
+        _pipeline(settings, model),
+        CameraFactory().create(settings),
+        GuidedCameraPreview(
+            width_ratio=settings.preview_guide_width_ratio,
+            height_ratio=settings.preview_guide_height_ratio,
+        ),
+    )
+    _print_model(recognizer.predict(confidence_threshold=confidence, guided=preview))
 
 
 @cli.command()

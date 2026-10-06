@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import Protocol
 
+import numpy as np
+from numpy.typing import NDArray
+
 
 class CameraError(RuntimeError):
     """Raised when a configured camera cannot capture an image."""
@@ -15,5 +18,7 @@ class CameraCapture(Protocol):
     def open(self) -> None: ...
 
     def capture(self, destination: Path) -> None: ...
+
+    def read_frame(self) -> NDArray[np.uint8]: ...
 
     def close(self) -> None: ...

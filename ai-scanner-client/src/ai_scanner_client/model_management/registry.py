@@ -23,6 +23,7 @@ class ModelSummary(RegistryModel):
     run_id: str
     format: str
     directory: str
+    has_detector: bool = False
 
 
 class InvalidBundle(RegistryModel):
@@ -102,11 +103,21 @@ class ModelRegistry:
             actual_hash = self._sha256(model_path)
             if actual_hash != manifest.model_sha256:
                 raise ValueError("model SHA-256 does not match the manifest")
+        detector_path = None
+        if manifest.detector is not None:
+            detector_path = self._resolve_artifact(directory, manifest.detector.model_file)
+            if not detector_path.is_file():
+                raise ValueError(f"detector file is missing: {manifest.detector.model_file}")
+            if manifest.detector.model_sha256 is not None:
+                actual_hash = self._sha256(detector_path)
+                if actual_hash != manifest.detector.model_sha256:
+                    raise ValueError("detector SHA-256 does not match the manifest")
         return ModelBundle(
             manifest=manifest,
             directory=directory.resolve(),
             model_path=model_path,
             class_mapping_path=class_mapping_path,
+            detector_path=detector_path,
         )
 
     @staticmethod
@@ -136,6 +147,7 @@ class ModelRegistry:
                 run_id=bundle.manifest.run_id,
                 format=bundle.manifest.format.value,
                 directory=str(bundle.directory),
+                has_detector=bundle.detector_path is not None,
             )
             for bundle in sorted(self._bundles.values(), key=lambda item: item.manifest.id)
         ]

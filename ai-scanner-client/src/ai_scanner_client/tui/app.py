@@ -11,8 +11,10 @@ from textual.widgets import Button, DataTable, Footer, Header, Label, Static
 from ai_scanner_client.backend.client import ScannerBackendClient
 from ai_scanner_client.camera.base import CameraCapture
 from ai_scanner_client.camera.factory import CameraFactory
+from ai_scanner_client.camera.preview import GuidedCameraPreview
 from ai_scanner_client.config import ClientSettings
 from ai_scanner_client.inference.classifier import SymbolClassifier
+from ai_scanner_client.inference.pipeline import SymbolRecognitionPipeline
 from ai_scanner_client.model_management.factory import ClassifierFactory
 from ai_scanner_client.model_management.manager import ModelManager
 from ai_scanner_client.model_management.registry import (
@@ -21,7 +23,8 @@ from ai_scanner_client.model_management.registry import (
     RegistrySnapshot,
 )
 from ai_scanner_client.model_management.selection import ModelSelectionStore
-from ai_scanner_client.models import DocumentMarkers, RecognitionResult, ScanSession
+from ai_scanner_client.models import DocumentMarkers, PagePrediction, RecognitionResult, ScanSession
+from ai_scanner_client.scanning.page import CameraPageRecognizer
 from ai_scanner_client.scanning.session import RecordingSession
 
 
@@ -71,6 +74,7 @@ class AiScannerTui(App[None]):
         ("r", "refresh_models", "Refresh models"),
         ("s", "select_model", "Select model"),
         ("b", "check_backend", "Check backend"),
+        ("p", "scan_sequence", "Scan sequence"),
         ("q", "quit", "Quit"),
     ]
 
@@ -93,6 +97,7 @@ class AiScannerTui(App[None]):
         self._camera_factory = camera_factory or self._create_camera
         self._highlighted_model_id: str | None = None
         self._loaded_classifier: SymbolClassifier | None = None
+        self._loaded_pipeline: SymbolRecognitionPipeline | None = None
         self._loaded_model_id: str | None = None
         self._recording: RecordingSession | None = None
         self._selected_marker_id: UUID | None = None
@@ -120,6 +125,14 @@ class AiScannerTui(App[None]):
                     yield Label("Backend", classes="panel-title section-title")
                     yield NavigableButton("Check connection", id="check-backend")
                     yield Static("Backend has not been checked.", id="backend-status")
+                    yield Label("Sequence scanner", classes="panel-title section-title")
+                    yield NavigableButton(
+                        "Open camera preview",
+                        id="scan-sequence",
+                        variant="success",
+                        disabled=True,
+                    )
+                    yield Static("Select a model bundle with a detector.", id="sequence-status")
             with Vertical(id="recording-panel", classes="panel"):
                 yield Label("Recording session", classes="panel-title")
                 with Horizontal(classes="button-row recording-actions"):
@@ -225,6 +238,10 @@ class AiScannerTui(App[None]):
     def scan_marker_button_pressed(self) -> None:
         self.action_scan_marker()
 
+    @on(Button.Pressed, "#scan-sequence")
+    def scan_sequence_button_pressed(self) -> None:
+        self.action_scan_sequence()
+
     def action_refresh_models(self) -> None:
         self.query_one("#models-status", Static).update("Scanning models…")
         self._refresh_models_worker()
@@ -264,6 +281,18 @@ class AiScannerTui(App[None]):
         )
         self._scan_marker_worker(self._selected_marker_id)
 
+    def action_scan_sequence(self) -> None:
+        if self._recording is not None:
+            self.notify(
+                "Complete the active recording session before opening the sequence camera.",
+                severity="warning",
+            )
+            return
+        self.query_one("#sequence-status", Static).update(
+            "Opening camera preview… Place one horizontal sequence inside the guide."
+        )
+        self._scan_sequence_worker()
+
     @work(thread=True, group="models", exclusive=True, exit_on_error=False)
     def _refresh_models_worker(self) -> None:
         try:
@@ -282,6 +311,7 @@ class AiScannerTui(App[None]):
             self.call_from_thread(self._show_worker_error, "models-status", error)
             return
         self._loaded_classifier = None
+        self._loaded_pipeline = None
         self._loaded_model_id = None
         self.call_from_thread(self._display_snapshot, snapshot)
         self.call_from_thread(
@@ -289,6 +319,27 @@ class AiScannerTui(App[None]):
             f"Selected model {selection.model_id}",
             severity="information",
         )
+
+    @work(thread=True, group="sequence", exclusive=True, exit_on_error=False)
+    def _scan_sequence_worker(self) -> None:
+        try:
+            bundle = self._model_manager.selected_bundle()
+            if self._loaded_pipeline is None or self._loaded_model_id != bundle.manifest.id:
+                self._loaded_pipeline = self._model_manager.create_pipeline(bundle.manifest.id)
+                self._loaded_model_id = bundle.manifest.id
+            recognizer = CameraPageRecognizer(
+                self._loaded_pipeline,
+                self._camera_factory(),
+                GuidedCameraPreview(
+                    width_ratio=self._settings.preview_guide_width_ratio,
+                    height_ratio=self._settings.preview_guide_height_ratio,
+                ),
+            )
+            result = recognizer.predict(guided=True)
+        except Exception as error:
+            self.call_from_thread(self._show_worker_error, "sequence-status", error)
+            return
+        self.call_from_thread(self._display_sequence_result, result)
 
     @work(thread=True, group="backend", exclusive=True, exit_on_error=False)
     def _check_backend_worker(self) -> None:
@@ -390,6 +441,15 @@ class AiScannerTui(App[None]):
                 )
                 details = f"{details}\n\nRejected bundles:\n{issues}"
             self.query_one("#model-details", Static).update(details)
+        selected_model = next((model for model in snapshot.models if model.id == current_id), None)
+        self.query_one("#scan-sequence", Button).disabled = (
+            selected_model is None or not selected_model.has_detector or self._recording is not None
+        )
+        self.query_one("#sequence-status", Static).update(
+            "Ready: open the camera and place one horizontal sequence in the guide."
+            if selected_model is not None and selected_model.has_detector
+            else "Select a model bundle with a detector."
+        )
 
     def _show_model_details(self, model_id: str) -> None:
         try:
@@ -401,25 +461,28 @@ class AiScannerTui(App[None]):
         preprocessing = manifest.preprocessing
         selected = self._model_manager.current_selection()
         selected_text = "yes" if selected and selected.model_id == model_id else "no"
-        self.query_one("#model-details", Static).update(
-            "\n".join(
+        details = [
+            f"ID: {manifest.id}",
+            f"Architecture: {manifest.architecture}",
+            f"Run: {manifest.run_id}",
+            f"Format: {manifest.format.value}",
+            f"Selected: {selected_text}",
+            "",
+            (f"Input: {preprocessing.width}x{preprocessing.height} {preprocessing.color_mode}"),
+            f"Resize: {preprocessing.resize}",
+            f"Normalization: {preprocessing.normalization}",
+            f"Model: {bundle.model_path}",
+        ]
+        if manifest.detector is not None:
+            details.extend(
                 [
-                    f"ID: {manifest.id}",
-                    f"Architecture: {manifest.architecture}",
-                    f"Run: {manifest.run_id}",
-                    f"Format: {manifest.format.value}",
-                    f"Selected: {selected_text}",
                     "",
-                    (
-                        f"Input: {preprocessing.width}x{preprocessing.height} "
-                        f"{preprocessing.color_mode}"
-                    ),
-                    f"Resize: {preprocessing.resize}",
-                    f"Normalization: {preprocessing.normalization}",
-                    f"Model: {bundle.model_path}",
+                    f"Detector: {manifest.detector.architecture}",
+                    f"Detector run: {manifest.detector.run_id}",
+                    f"Detector model: {bundle.detector_path}",
                 ]
             )
-        )
+        self.query_one("#model-details", Static).update("\n".join(details))
 
     def _display_backend_identity(self, name: str, scanner_id: str) -> None:
         self.query_one("#backend-status", Static).update(f"Connected as {name} ({scanner_id})")
@@ -437,6 +500,7 @@ class AiScannerTui(App[None]):
         self.query_one("#start-recording", Button).disabled = True
         self.query_one("#complete-recording", Button).disabled = False
         self.query_one("#scan-marker", Button).disabled = not document.markers
+        self.query_one("#scan-sequence", Button).disabled = True
         self._display_markers(document)
         if document.markers:
             self.query_one("#markers-table", DataTable).focus()
@@ -470,11 +534,7 @@ class AiScannerTui(App[None]):
                 )
             else:
                 preferred_row = next(
-                    (
-                        index
-                        for index, marker in enumerate(document.markers)
-                        if not marker.content
-                    ),
+                    (index for index, marker in enumerate(document.markers) if not marker.content),
                     0,
                 )
             self._selected_marker_id = document.markers[preferred_row].id
@@ -507,9 +567,23 @@ class AiScannerTui(App[None]):
         self.query_one("#start-recording", Button).disabled = False
         self.query_one("#complete-recording", Button).disabled = True
         self.query_one("#scan-marker", Button).disabled = True
+        selected = self._model_manager.current_selection()
+        selected_model = self._models.get(selected.model_id) if selected is not None else None
+        self.query_one("#scan-sequence", Button).disabled = (
+            selected_model is None or not selected_model.has_detector
+        )
         self.query_one("#markers-table", DataTable).clear()
         self._selected_marker_id = None
         self.query_one("#start-recording", Button).focus()
+
+    def _display_sequence_result(self, result: PagePrediction) -> None:
+        sequence = result.sequence or "(geen symbolen gevonden)"
+        self.query_one("#sequence-status", Static).update(
+            f"Sequence: {sequence} · {len(result.detections)} detectie(s) · "
+            f"{result.detector_architecture}/{result.detector_run_id} → "
+            f"{result.classifier_architecture}/{result.classifier_run_id}"
+        )
+        self.query_one("#scan-sequence", Button).focus()
 
     def _create_backend(self) -> ScannerBackendClient:
         return ScannerBackendClient(

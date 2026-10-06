@@ -7,6 +7,7 @@ from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
+from PIL import Image
 
 from ai_scanner_client.inference.preprocessing import ImagePreprocessor
 from ai_scanner_client.models import Prediction
@@ -18,6 +19,8 @@ class PredictiveModel(Protocol):
 
 class SymbolClassifier(Protocol):
     def predict(self, image_path: Path) -> Prediction: ...
+
+    def predict_images(self, images: list[Image.Image]) -> list[Prediction]: ...
 
 
 ModelLoader = Callable[[Path], PredictiveModel]
@@ -47,27 +50,38 @@ class KerasSymbolClassifier:
 
     def predict(self, image_path: Path) -> Prediction:
         inputs = self._preprocessor.prepare(image_path)
+        return self._predict_batch(inputs)[0]
+
+    def predict_images(self, images: list[Image.Image]) -> list[Prediction]:
+        if not images:
+            return []
+        return self._predict_batch(self._preprocessor.prepare_images(images))
+
+    def _predict_batch(self, inputs: NDArray[np.float32]) -> list[Prediction]:
         with self._prediction_lock:
             raw_predictions = self._model.predict(inputs, verbose=0)
         scores = np.asarray(raw_predictions, dtype=np.float32)
-        if scores.ndim == 2 and scores.shape[0] == 1:
-            scores = scores[0]
-        if scores.ndim != 1 or scores.shape[0] != len(self._class_names):
+        if scores.ndim != 2 or scores.shape != (inputs.shape[0], len(self._class_names)):
             raise ValueError(
                 "Model output does not match the class mapping: "
                 f"shape={scores.shape}, classes={len(self._class_names)}"
             )
         if not np.all(np.isfinite(scores)):
             raise ValueError("Model output contains non-finite values")
-        class_index = int(np.argmax(scores))
-        return Prediction(
-            model_id=self._model_id,
-            architecture=self._architecture,
-            run_id=self._run_id,
-            label=self._class_names[class_index],
-            confidence=float(scores[class_index]),
-            class_index=class_index,
-        )
+        predictions = []
+        for row in scores:
+            class_index = int(np.argmax(row))
+            predictions.append(
+                Prediction(
+                    model_id=self._model_id,
+                    architecture=self._architecture,
+                    run_id=self._run_id,
+                    label=self._class_names[class_index],
+                    confidence=float(row[class_index]),
+                    class_index=class_index,
+                )
+            )
+        return predictions
 
     @staticmethod
     def _load_class_names(path: Path) -> Sequence[str]:

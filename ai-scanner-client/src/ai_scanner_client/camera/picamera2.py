@@ -2,6 +2,10 @@ from importlib import import_module
 from pathlib import Path
 from time import sleep
 
+import numpy as np
+from numpy.typing import NDArray
+from PIL import Image
+
 from ai_scanner_client.camera.base import CameraError
 
 
@@ -58,6 +62,18 @@ class Picamera2Camera:
             self._camera.capture_file(str(destination))
         except Exception as error:
             raise CameraError(f"Could not capture an image from {self.name}: {error}") from error
+
+    def read_frame(self) -> NDArray[np.uint8]:
+        if self._camera is None:
+            raise CameraError("Picamera2 camera is not open")
+        try:
+            frame = self._camera.capture_array()
+        except Exception as error:
+            raise CameraError(f"Could not read a frame from {self.name}: {error}") from error
+        array = np.asarray(frame, dtype=np.uint8)
+        if array.ndim != 3 or array.shape[2] < 3:
+            raise CameraError(f"Camera returned an invalid frame shape: {array.shape}")
+        return np.asarray(Image.fromarray(array[..., :3]).convert("RGB"), dtype=np.uint8)
 
     def close(self) -> None:
         camera = self._camera

@@ -55,6 +55,15 @@ Screen {
     min-height: 1;
 }
 
+#sequence-status {
+    color: $text-muted;
+    min-height: 2;
+}
+
+#scan-sequence {
+    margin-bottom: 1;
+}
+
 #model-details {
     min-height: 10;
 }

@@ -3,6 +3,7 @@
 from ai_scanner_client.application import PiClientApplication
 from ai_scanner_client.backend.client import ScannerBackendClient
 from ai_scanner_client.inference.classifier import KerasSymbolClassifier
+from ai_scanner_client.inference.pipeline import SymbolRecognitionPipeline
 from ai_scanner_client.model_management.manager import ModelManager
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "ModelManager",
     "PiClientApplication",
     "ScannerBackendClient",
+    "SymbolRecognitionPipeline",
 ]

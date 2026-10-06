@@ -16,6 +16,7 @@ def write_bundle(models_directory: Path) -> None:
     bundle = models_directory / "cnn-v1-test"
     bundle.mkdir(parents=True)
     (bundle / "model.keras").write_bytes(b"model")
+    (bundle / "detector.pt").write_bytes(b"detector")
     (bundle / "class_mapping.json").write_text('["0", "1"]', encoding="utf-8")
     (bundle / "manifest.json").write_text(
         json.dumps(
@@ -27,6 +28,12 @@ def write_bundle(models_directory: Path) -> None:
                 "format": "keras",
                 "modelFile": "model.keras",
                 "classMappingFile": "class_mapping.json",
+                "detector": {
+                    "format": "ultralytics",
+                    "architecture": "yolo11n",
+                    "runId": "detector-test-run",
+                    "modelFile": "detector.pt",
+                },
                 "deployable": True,
             }
         ),
@@ -52,6 +59,7 @@ def test_tui_discovers_and_selects_model(tmp_path: Path) -> None:
             assert "1 valid model" in str(app.query_one("#models-status", Static).content)
             assert app.query_one("#start-recording", Button).disabled is False
             assert app.query_one("#scan-marker", Button).disabled is True
+            assert app.query_one("#scan-sequence", Button).disabled is True
             assert app.focused is table
 
             await pilot.press("right")
@@ -62,6 +70,7 @@ def test_tui_discovers_and_selects_model(tmp_path: Path) -> None:
 
             await pilot.press("enter")
             await app.workers.wait_for_complete()
+            assert app.query_one("#scan-sequence", Button).disabled is False
 
             app._display_recording(
                 ScanSession(
@@ -86,6 +95,7 @@ def test_tui_discovers_and_selects_model(tmp_path: Path) -> None:
                 "Test camera",
             )
             await pilot.pause()
+            assert app.query_one("#scan-sequence", Button).disabled is True
             markers = app.query_one("#markers-table", DataTable)
             assert app.focused is markers
 

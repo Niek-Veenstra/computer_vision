@@ -24,6 +24,8 @@ class ClientSettings(BaseSettings):
     camera_width: int = Field(default=1280, ge=128, le=8192)
     camera_height: int = Field(default=720, ge=128, le=8192)
     camera_warmup_seconds: float = Field(default=1.0, ge=0, le=30)
+    preview_guide_width_ratio: float = Field(default=0.85, gt=0, le=1)
+    preview_guide_height_ratio: float = Field(default=0.35, gt=0, le=1)
 
     def require_scanner_api_key(self) -> str:
         if self.scanner_api_key is None:

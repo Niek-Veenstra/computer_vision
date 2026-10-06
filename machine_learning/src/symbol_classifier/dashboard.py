@@ -19,9 +19,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import streamlit as st
 from keras.utils import image_dataset_from_directory
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from symbol_classifier import MODEL_BUILDERS, MODEL_LABELS
+from symbol_classifier.end_to_end import (
+    match_detections,
+    pipeline_metrics,
+    read_yolo_ground_truth,
+)
 
 
 MODEL_PATH = Path("symbol_classifier_final.keras")
@@ -29,6 +34,8 @@ DATA_DIR = Path("symbols_and_operators/classifier")
 CLASS_FILE = Path("symbols_and_operators/classes.txt")
 LEARNING_CURVE_DIR = Path("runs/learning_curve")
 MODEL_RUNS_DIR = Path("runs/models")
+DETECTOR_RUNS_DIR = Path("runs/detect")
+PIPELINE_DATA_DIR = Path("symbols_and_operators")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 IMAGE_SIZE = (128, 128)
 BATCH_SIZE = 32
@@ -88,6 +95,15 @@ def available_trained_models() -> dict[str, dict]:
             "metadata": metadata,
         }
     return models_by_key
+
+
+def available_detector_models() -> dict[str, Path]:
+    detector_paths = sorted(
+        DETECTOR_RUNS_DIR.glob("*/weights/best.pt"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    return {path.parent.parent.name: path for path in detector_paths}
 
 
 def model_training_statuses() -> list[tuple[Path, dict]]:
@@ -326,6 +342,183 @@ def evaluate_model(
 @st.cache_resource
 def load_inference_model(model_path: str, _model_timestamp: int):
     return keras.models.load_model(model_path)
+
+
+@st.cache_resource
+def load_detector_model(model_path: str, _model_timestamp: int):
+    from ultralytics import YOLO
+
+    return YOLO(model_path)
+
+
+@st.cache_data(show_spinner="Volledige detectie- en classificatiepipeline evalueren…")
+def evaluate_pipeline(
+    detector_path: str,
+    classifier_path: str,
+    image_path: str,
+    label_path: str,
+    classifier_class_names: tuple[str, ...],
+    confidence_threshold: float,
+    iou_threshold: float,
+    detector_image_size: int,
+    _detector_timestamp: int,
+    _classifier_timestamp: int,
+    _image_timestamp: int,
+    _label_timestamp: int,
+) -> dict:
+    image = load_rgb_image(Path(image_path))
+    detector = load_detector_model(detector_path, _detector_timestamp)
+    detector_result = detector.predict(
+        source=np.asarray(image),
+        conf=confidence_threshold,
+        imgsz=detector_image_size,
+        max_det=500,
+        verbose=False,
+    )[0]
+    if detector_result.boxes is None:
+        predicted_boxes = np.empty((0, 4), dtype=np.float32)
+        predicted_confidences = np.empty(0, dtype=np.float32)
+    else:
+        predicted_boxes = detector_result.boxes.xyxy.cpu().numpy().astype(np.float32)
+        predicted_confidences = detector_result.boxes.conf.cpu().numpy().astype(np.float32)
+
+    classifier = load_inference_model(classifier_path, _classifier_timestamp)
+    classifier_probabilities = np.empty(
+        (0, len(classifier_class_names)), dtype=np.float32
+    )
+    if len(predicted_boxes):
+        crops = []
+        for left, top, right, bottom in predicted_boxes:
+            crop_box = (
+                max(0, int(np.floor(left))),
+                max(0, int(np.floor(top))),
+                min(image.width, int(np.ceil(right))),
+                min(image.height, int(np.ceil(bottom))),
+            )
+            crop = image.crop(crop_box).resize(IMAGE_SIZE, Image.Resampling.BILINEAR)
+            crops.append(np.asarray(crop, dtype=np.float32))
+        classifier_probabilities = classifier.predict(
+            np.stack(crops), batch_size=BATCH_SIZE, verbose=0
+        )
+
+    classifier_output_indices = (
+        np.argmax(classifier_probabilities, axis=1).astype(np.int32)
+        if len(classifier_probabilities)
+        else np.empty(0, dtype=np.int32)
+    )
+    predicted_class_ids = np.asarray(
+        [
+            int(classifier_class_names[index].removeprefix("class_"))
+            for index in classifier_output_indices
+        ],
+        dtype=np.int32,
+    )
+    ground_truth_class_ids, ground_truth_boxes = read_yolo_ground_truth(
+        Path(image_path), Path(label_path)
+    )
+    prediction_to_ground_truth, ground_truth_to_prediction, matched_ious = (
+        match_detections(
+            ground_truth_boxes,
+            predicted_boxes,
+            predicted_confidences,
+            iou_threshold,
+        )
+    )
+
+    return {
+        "ground_truth_class_ids": ground_truth_class_ids,
+        "ground_truth_boxes": ground_truth_boxes,
+        "predicted_class_ids": predicted_class_ids,
+        "predicted_boxes": predicted_boxes,
+        "predicted_confidences": predicted_confidences,
+        "classifier_probabilities": classifier_probabilities,
+        "prediction_to_ground_truth": prediction_to_ground_truth,
+        "ground_truth_to_prediction": ground_truth_to_prediction,
+        "matched_ious": matched_ious,
+        "metrics": pipeline_metrics(
+            ground_truth_class_ids,
+            predicted_class_ids,
+            prediction_to_ground_truth,
+        ),
+    }
+
+
+def pipeline_annotation(
+    image: Image.Image, results: dict, symbols: list[str]
+) -> Image.Image:
+    annotated = image.copy()
+    draw = ImageDraw.Draw(annotated)
+    ground_truth_boxes = results["ground_truth_boxes"]
+    predicted_boxes = results["predicted_boxes"]
+    predicted_classes = results["predicted_class_ids"]
+    prediction_to_ground_truth = results["prediction_to_ground_truth"]
+    ground_truth_to_prediction = results["ground_truth_to_prediction"]
+    actual_classes = results["ground_truth_class_ids"]
+
+    for ground_truth_index in np.flatnonzero(ground_truth_to_prediction < 0):
+        box = tuple(ground_truth_boxes[ground_truth_index])
+        draw.rectangle(box, outline="red", width=4)
+
+    for prediction_index, box_values in enumerate(predicted_boxes):
+        ground_truth_index = prediction_to_ground_truth[prediction_index]
+        if ground_truth_index < 0:
+            color = "deepskyblue"
+            prefix = "extra"
+        elif predicted_classes[prediction_index] == actual_classes[ground_truth_index]:
+            color = "limegreen"
+            prefix = "goed"
+        else:
+            color = "orange"
+            prefix = f"{symbols[actual_classes[ground_truth_index]]}→"
+        box = tuple(box_values)
+        draw.rectangle(box, outline=color, width=4)
+        predicted_symbol = symbols[predicted_classes[prediction_index]]
+        draw.text((box[0] + 3, max(0, box[1] - 14)), f"{prefix} {predicted_symbol}", fill=color)
+    return annotated
+
+
+def pipeline_error_rows(results: dict, symbols: list[str]) -> list[dict]:
+    rows = []
+    actual_classes = results["ground_truth_class_ids"]
+    predicted_classes = results["predicted_class_ids"]
+    confidences = results["predicted_confidences"]
+    prediction_to_ground_truth = results["prediction_to_ground_truth"]
+    ground_truth_to_prediction = results["ground_truth_to_prediction"]
+    matched_ious = results["matched_ious"]
+
+    for ground_truth_index in np.flatnonzero(ground_truth_to_prediction < 0):
+        rows.append(
+            {
+                "Uitkomst": "Gemist",
+                "Werkelijk": symbols[actual_classes[ground_truth_index]],
+                "Voorspeld": "—",
+                "Detector confidence": None,
+                "IoU": None,
+            }
+        )
+    for prediction_index, ground_truth_index in enumerate(prediction_to_ground_truth):
+        if ground_truth_index < 0:
+            outcome = "Extra detectie"
+            actual = "—"
+        elif predicted_classes[prediction_index] != actual_classes[ground_truth_index]:
+            outcome = "Verkeerd geclassificeerd"
+            actual = symbols[actual_classes[ground_truth_index]]
+        else:
+            continue
+        rows.append(
+            {
+                "Uitkomst": outcome,
+                "Werkelijk": actual,
+                "Voorspeld": symbols[predicted_classes[prediction_index]],
+                "Detector confidence": float(confidences[prediction_index]),
+                "IoU": (
+                    float(matched_ious[prediction_index])
+                    if ground_truth_index >= 0
+                    else None
+                ),
+            }
+        )
+    return rows
 
 
 def project_images(directory: Path) -> list[Path]:
@@ -635,6 +828,7 @@ def main() -> None:
         confusion_tab,
         errors_tab,
         inference_tab,
+        pipeline_tab,
         dataset_tab,
         resize_comparison_tab,
         model_training_tab,
@@ -645,6 +839,7 @@ def main() -> None:
             "Confusion matrix",
             "Fouten",
             "Inference",
+            "End-to-end",
             "Dataset",
             "Resize vergelijking",
             "Model trainen",
@@ -767,6 +962,177 @@ def main() -> None:
                     )
                 },
             )
+
+    with pipeline_tab:
+        st.subheader("Detector → classifier evaluatie")
+        st.write(
+            "Meet eerst of YOLO ieder symbool vindt en daarna of de geselecteerde "
+            "classifier de gevonden crop correct herkent. Voorspellingen worden "
+            "één-op-één aan annotaties gekoppeld met intersection-over-union (IoU)."
+        )
+        detector_models = available_detector_models()
+        pipeline_images = [
+            image_path
+            for image_path in project_images(PIPELINE_DATA_DIR / "images" / "val")
+            if (PIPELINE_DATA_DIR / "labels" / "val" / f"{image_path.stem}.txt").is_file()
+        ]
+        if not detector_models:
+            st.warning("Geen detectorcheckpoint gevonden onder runs/detect/*/weights/best.pt.")
+        elif not pipeline_images:
+            st.warning("Geen complete validatieafbeelding met YOLO-labelbestand gevonden.")
+        else:
+            with st.form("pipeline_evaluation_form"):
+                pipeline_controls = st.columns(5)
+                detector_name = pipeline_controls[0].selectbox(
+                    "Detectorrun", tuple(detector_models)
+                )
+                pipeline_image = pipeline_controls[1].selectbox(
+                    "Validatiepagina", pipeline_images, format_func=lambda path: path.name
+                )
+                confidence_threshold = pipeline_controls[2].slider(
+                    "Detector confidence", 0.01, 0.95, 0.25, 0.01
+                )
+                iou_threshold = pipeline_controls[3].slider(
+                    "Match-IoU", 0.10, 0.90, 0.50, 0.05
+                )
+                detector_image_size = pipeline_controls[4].selectbox(
+                    "YOLO-resolutie", (640, 960, 1280), index=1
+                )
+                run_pipeline = st.form_submit_button(
+                    "Voer end-to-end evaluatie uit", type="primary"
+                )
+
+            st.caption(
+                f"Classifier: {selected_model['model_name']} / {selected_model['run_id']} · "
+                f"detector: {detector_name}. De huidige validatieset bevat slechts één "
+                "bronpagina; dit is nog geen onafhankelijke generalisatietest."
+            )
+            if run_pipeline:
+                detector_path = detector_models[detector_name]
+                label_path = (
+                    PIPELINE_DATA_DIR / "labels" / "val" / f"{pipeline_image.stem}.txt"
+                )
+                pipeline_results = evaluate_pipeline(
+                    str(detector_path),
+                    str(selected_model_path),
+                    str(pipeline_image),
+                    str(label_path),
+                    tuple(validation_results["class_names"]),
+                    float(confidence_threshold),
+                    float(iou_threshold),
+                    int(detector_image_size),
+                    detector_path.stat().st_mtime_ns,
+                    selected_model_path.stat().st_mtime_ns,
+                    pipeline_image.stat().st_mtime_ns,
+                    label_path.stat().st_mtime_ns,
+                )
+                pipeline_metrics_result = pipeline_results["metrics"]
+                metric_columns = st.columns(6)
+                metric_columns[0].metric(
+                    "Detectie precision",
+                    f"{pipeline_metrics_result['detection_precision']:.1%}",
+                )
+                metric_columns[1].metric(
+                    "Detectie recall", f"{pipeline_metrics_result['detection_recall']:.1%}"
+                )
+                metric_columns[2].metric(
+                    "Classificatie op matches",
+                    f"{pipeline_metrics_result['classification_accuracy_on_matches']:.1%}",
+                )
+                metric_columns[3].metric(
+                    "End-to-end precision",
+                    f"{pipeline_metrics_result['end_to_end_precision']:.1%}",
+                )
+                metric_columns[4].metric(
+                    "End-to-end recall",
+                    f"{pipeline_metrics_result['end_to_end_recall']:.1%}",
+                )
+                metric_columns[5].metric(
+                    "End-to-end F1", f"{pipeline_metrics_result['end_to_end_f1']:.1%}"
+                )
+
+                outcome_columns = st.columns(4)
+                outcome_columns[0].metric("Correct", pipeline_metrics_result["correct"])
+                outcome_columns[1].metric(
+                    "Verkeerd geclassificeerd", pipeline_metrics_result["misclassified"]
+                )
+                outcome_columns[2].metric("Gemist", pipeline_metrics_result["missed"])
+                outcome_columns[3].metric(
+                    "Extra detecties", pipeline_metrics_result["false_positives"]
+                )
+
+                annotated_image = pipeline_annotation(
+                    load_rgb_image(pipeline_image), pipeline_results, symbols
+                )
+                st.image(
+                    annotated_image,
+                    caption=(
+                        "Groen: volledig correct · oranje: verkeerde klasse · "
+                        "rood: gemiste annotatie · blauw: extra detectie"
+                    ),
+                    width="stretch",
+                )
+
+                actual_classes = pipeline_results["ground_truth_class_ids"]
+                predicted_classes = pipeline_results["predicted_class_ids"]
+                ground_truth_to_prediction = pipeline_results[
+                    "ground_truth_to_prediction"
+                ]
+                per_class_rows = []
+                for class_id, symbol in enumerate(symbols):
+                    ground_truth_indices = np.flatnonzero(actual_classes == class_id)
+                    detected_indices = [
+                        index
+                        for index in ground_truth_indices
+                        if ground_truth_to_prediction[index] >= 0
+                    ]
+                    correct = sum(
+                        predicted_classes[ground_truth_to_prediction[index]] == class_id
+                        for index in detected_indices
+                    )
+                    support = len(ground_truth_indices)
+                    per_class_rows.append(
+                        {
+                            "Symbool": symbol,
+                            "Werkelijk": support,
+                            "Gedetecteerd": len(detected_indices),
+                            "Correct end-to-end": int(correct),
+                            "Detectie recall": (
+                                len(detected_indices) / support if support else 0.0
+                            ),
+                            "End-to-end recall": correct / support if support else 0.0,
+                        }
+                    )
+                st.subheader("Resultaat per klasse")
+                st.dataframe(
+                    per_class_rows,
+                    hide_index=True,
+                    width="stretch",
+                    column_config={
+                        "Detectie recall": st.column_config.ProgressColumn(
+                            format="percent", min_value=0, max_value=1
+                        ),
+                        "End-to-end recall": st.column_config.ProgressColumn(
+                            format="percent", min_value=0, max_value=1
+                        ),
+                    },
+                )
+                error_rows = pipeline_error_rows(pipeline_results, symbols)
+                st.subheader("Foutuitsplitsing")
+                if error_rows:
+                    st.dataframe(
+                        error_rows,
+                        hide_index=True,
+                        width="stretch",
+                        column_config={
+                            "Detector confidence": st.column_config.NumberColumn(
+                                format="percent"
+                            ),
+                            "IoU": st.column_config.NumberColumn(format="%.3f"),
+                        },
+                    )
+                else:
+                    st.success("Geen end-to-end fouten bij deze instellingen.")
 
     with dataset_tab:
         st.subheader("Klasseverdeling")

@@ -96,3 +96,28 @@ def test_select_rejects_unknown_model(tmp_path: Path) -> None:
 
     with pytest.raises(ModelNotFoundError, match="Available models: none"):
         manager.select("missing")
+
+
+def test_refresh_validates_optional_detector_artifact(tmp_path: Path) -> None:
+    models_directory = tmp_path / "models"
+    bundle = write_bundle(models_directory, "pipeline-model")
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["detector"] = {
+        "format": "ultralytics",
+        "architecture": "yolo11n",
+        "runId": "symbol-detector4",
+        "modelFile": "detector.pt",
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    snapshot = ModelRegistry(models_directory).refresh()
+
+    assert snapshot.models == []
+    assert "detector file is missing" in snapshot.invalid_bundles[0].reason
+
+    (bundle / "detector.pt").write_bytes(b"detector")
+    snapshot = ModelRegistry(models_directory).refresh()
+
+    assert snapshot.models[0].has_detector is True
+    assert ModelRegistry(models_directory).refresh().models[0].id == "pipeline-model"
