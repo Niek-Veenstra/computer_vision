@@ -235,7 +235,7 @@ async function deleteCompletedScanSession(session: ScanSession) {
           >Discard local edits and reload</Button
         >
       </div>
-      <Tabs v-model="activeTab" :unmount-on-hide="false" class="gap-6">
+      <Tabs v-model="activeTab" :unmount-on-hide="false" class="gap-4">
         <TabsList class="grid w-full grid-cols-2 border sm:w-96" aria-label="Document sections">
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="sessions">
