@@ -1,7 +1,7 @@
 services:
   computer-vision-backend:
     image: postgres:16
-    container_name: postgres_db
+    container_name: computer_vision_backend
     restart: unless-stopped
     ports:
       - "6084:5432"
