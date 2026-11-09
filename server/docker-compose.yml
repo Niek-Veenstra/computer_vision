@@ -4,11 +4,11 @@ services:
     container_name: computer_vision_backend
     restart: unless-stopped
     ports:
-      - "6084:5432"
+      - "${DB_PORT:?Set DB_PORT in .env}:5432"
     environment:
-      POSTGRES_USER: computer-vision-app
-      POSTGRES_PASSWORD: computer-vision-app
-      POSTGRES_DB: computer-vision-app
+      POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_DATABASE:?Set DB_DATABASE in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

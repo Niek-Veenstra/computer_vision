@@ -768,9 +768,6 @@ def main() -> None:
         st.stop()
 
     trained_models = available_trained_models()
-    if not trained_models:
-        st.error("Er is nog geen getraind model beschikbaar.")
-        st.stop()
     if st.session_state.get("evaluation_model") not in (None, *trained_models):
         st.session_state.pop("evaluation_model")
     deleted_message = st.session_state.pop("model_deleted_message", None)
@@ -779,49 +776,55 @@ def main() -> None:
     stopped_message = st.session_state.pop("training_stopped_message", None)
     if stopped_message:
         st.warning(stopped_message)
-    selected_model_key = st.selectbox(
-        "Model voor resultaten en inference",
-        tuple(trained_models),
-        format_func=lambda key: trained_models[key]["label"],
-        key="evaluation_model",
-    )
-    selected_model = trained_models[selected_model_key]
-    selected_model_path = selected_model["path"]
-    st.caption(
-        f"Geselecteerd: {selected_model['label']} — bestand: {selected_model_path}"
-    )
-    selected_metadata = selected_model.get("metadata", {})
-    if selected_metadata:
-        st.caption(
-            f"Seed {selected_metadata.get('seed', '?')} · "
-            f"maximaal {selected_metadata.get('epochs', '?')} epochs · "
-            f"learning rate {selected_metadata.get('learning_rate', '?')} · "
-            f"{selected_metadata.get('parameters', '?')} parameters"
-        )
-
-    validation_results = evaluate_model(
-        str(selected_model_path),
-        str(DATA_DIR),
-        "val",
-        selected_model_path.stat().st_mtime_ns,
-        dataset_signature(DATA_DIR / "val"),
-    )
-    training_results = evaluate_model(
-        str(selected_model_path),
-        str(DATA_DIR),
-        "train",
-        selected_model_path.stat().st_mtime_ns,
-        dataset_signature(DATA_DIR / "train"),
-    )
     symbols = CLASS_FILE.read_text(encoding="utf-8").splitlines()
-    display_labels = [symbol_for(folder, symbols) for folder in validation_results["class_names"]]
+    class_names = sorted(path.name for path in (DATA_DIR / "val").iterdir() if path.is_dir())
+    display_labels = [symbol_for(folder, symbols) for folder in class_names]
+    if trained_models:
+        selected_model_key = st.selectbox(
+            "Model voor resultaten en inference",
+            tuple(trained_models),
+            format_func=lambda key: trained_models[key]["label"],
+            key="evaluation_model",
+        )
+        selected_model = trained_models[selected_model_key]
+        selected_model_path = selected_model["path"]
+        st.caption(
+            f"Geselecteerd: {selected_model['label']} — bestand: {selected_model_path}"
+        )
+        selected_metadata = selected_model.get("metadata", {})
+        if selected_metadata:
+            st.caption(
+                f"Seed {selected_metadata.get('seed', '?')} · "
+                f"maximaal {selected_metadata.get('epochs', '?')} epochs · "
+                f"learning rate {selected_metadata.get('learning_rate', '?')} · "
+                f"{selected_metadata.get('parameters', '?')} parameters"
+            )
 
-    columns = st.columns(5)
-    columns[0].metric("Accuracy", f"{validation_results['accuracy']:.1%}")
-    columns[1].metric("Balanced accuracy", f"{validation_results['balanced_accuracy']:.1%}")
-    columns[2].metric("Macro-F1", f"{validation_results['macro_f1']:.1%}")
-    columns[3].metric("Macro-precision", f"{validation_results['macro_precision']:.1%}")
-    columns[4].metric("Loss", f"{validation_results['loss']:.3f}")
+        validation_results = evaluate_model(
+            str(selected_model_path),
+            str(DATA_DIR),
+            "val",
+            selected_model_path.stat().st_mtime_ns,
+            dataset_signature(DATA_DIR / "val"),
+        )
+        training_results = evaluate_model(
+            str(selected_model_path),
+            str(DATA_DIR),
+            "train",
+            selected_model_path.stat().st_mtime_ns,
+            dataset_signature(DATA_DIR / "train"),
+        )
+        display_labels = [symbol_for(folder, symbols) for folder in validation_results["class_names"]]
+
+        columns = st.columns(5)
+        columns[0].metric("Accuracy", f"{validation_results['accuracy']:.1%}")
+        columns[1].metric("Balanced accuracy", f"{validation_results['balanced_accuracy']:.1%}")
+        columns[2].metric("Macro-F1", f"{validation_results['macro_f1']:.1%}")
+        columns[3].metric("Macro-precision", f"{validation_results['macro_precision']:.1%}")
+        columns[4].metric("Loss", f"{validation_results['loss']:.3f}")
+
+    else:
+        st.info("Er is nog geen getraind model. Start je eerste training in de tab Model trainen.")
 
     (
         performance_tab,
@@ -847,298 +850,304 @@ def main() -> None:
         ]
     )
 
-    with performance_tab:
-        rows = []
-        for index, folder in enumerate(validation_results["class_names"]):
-            rows.append({
-                "Klasse": folder,
-                "Symbool": display_labels[index],
-                "Voorbeelden": int(validation_results["support"][index]),
-                "Precision": float(validation_results["precision"][index]),
-                "Recall": float(validation_results["recall"][index]),
-                "F1": float(validation_results["f1"][index]),
-            })
-        st.dataframe(
-            rows,
-            hide_index=True,
-            width="stretch",
-            column_config={
-                "Precision": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
-                "Recall": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
-                "F1": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
-            },
-        )
-        figure, axis = plt.subplots(figsize=(11, 4))
-        axis.bar(display_labels, validation_results["f1"])
-        axis.set(title="F1 per klasse", xlabel="Symbool", ylabel="F1", ylim=(0, 1))
-        st.pyplot(figure)
-
-    with confusion_tab:
-        selected_split = st.radio(
-            "Gegevens",
-            ("Validatie", "Training"),
-            horizontal=True,
-            help="Training laat zien wat het model op geleerde voorbeelden doet; validatie is de relevantere controle.",
-        )
-        normalized = st.toggle("Normaliseer per werkelijke klasse", value=True)
-        matrix_results = validation_results if selected_split == "Validatie" else training_results
-        st.metric(f"Accuracy op {selected_split.lower()}", f"{matrix_results['accuracy']:.1%}")
-        st.pyplot(confusion_figure(matrix_results["confusion"], display_labels, normalized))
-
-    with errors_tab:
-        errors = np.flatnonzero(validation_results["actual"] != validation_results["predicted"])
-        st.write(
-            f"{len(errors)} van de {len(validation_results['actual'])} "
-            "validatiebeelden zijn verkeerd geclassificeerd."
-        )
-        if len(errors):
-            selected = st.selectbox(
-                "Foutvoorbeeld",
-                errors.tolist(),
-                format_func=lambda index: (
-                    f"{Path(validation_results['file_paths'][index]).name}: "
-                    f"{display_labels[validation_results['actual'][index]]} → "
-                    f"{display_labels[validation_results['predicted'][index]]}"
-                ),
-            )
-            predicted_index = validation_results["predicted"][selected]
-            st.image(validation_results["file_paths"][selected], width=240)
-            st.write({
-                "Werkelijk": display_labels[validation_results["actual"][selected]],
-                "Voorspeld": display_labels[predicted_index],
-                "Zekerheid": f"{validation_results['probabilities'][selected, predicted_index]:.1%}",
-            })
-
-    with inference_tab:
-        st.write(f"Test {selected_model['label']} met een uitgesneden symbool.")
-        source = st.radio("Afbeeldingsbron", ("Projectbestand", "Uploaden"), horizontal=True)
-        selected_image = None
-
-        if source == "Projectbestand":
-            directory_label = st.selectbox("Projectmap", tuple(PROJECT_IMAGE_DIRS))
-            directory = PROJECT_IMAGE_DIRS[directory_label]
-            available_images = project_images(directory)
-            if available_images:
-                selected_image = st.selectbox(
-                    "Afbeelding",
-                    available_images,
-                    format_func=lambda path: str(path.relative_to(directory)),
-                )
-            else:
-                st.warning(f"Geen afbeeldingen gevonden in {directory}.")
-        else:
-            selected_image = st.file_uploader(
-                "Afbeelding", type=tuple(extension.removeprefix(".") for extension in IMAGE_EXTENSIONS)
-            )
-
-        if selected_image is not None:
-            with Image.open(selected_image) as source_image:
-                image = source_image.convert("RGB")
-            array = np.asarray(image.resize(IMAGE_SIZE), dtype=np.float32)[None, ...]
-            model = load_inference_model(
-                str(selected_model_path), selected_model_path.stat().st_mtime_ns
-            )
-            probabilities = model.predict(array, verbose=0)[0]
-            top_indices = np.argsort(probabilities)[::-1][:5]
-            st.image(image, width=280)
-            st.success(
-                f"Voorspelling: {display_labels[top_indices[0]]} "
-                f"({probabilities[top_indices[0]]:.1%} zekerheid)"
-            )
+    if trained_models:
+        with performance_tab:
+            rows = []
+            for index, folder in enumerate(validation_results["class_names"]):
+                rows.append({
+                    "Klasse": folder,
+                    "Symbool": display_labels[index],
+                    "Voorbeelden": int(validation_results["support"][index]),
+                    "Precision": float(validation_results["precision"][index]),
+                    "Recall": float(validation_results["recall"][index]),
+                    "F1": float(validation_results["f1"][index]),
+                })
             st.dataframe(
-                [
-                    {
-                        "Klasse": validation_results["class_names"][index],
-                        "Symbool": display_labels[index],
-                        "Zekerheid": float(probabilities[index]),
-                    }
-                    for index in top_indices
-                ],
+                rows,
                 hide_index=True,
                 width="stretch",
                 column_config={
-                    "Zekerheid": st.column_config.ProgressColumn(
-                        format="percent", min_value=0, max_value=1
-                    )
+                    "Precision": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
+                    "Recall": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
+                    "F1": st.column_config.ProgressColumn(format="percent", min_value=0, max_value=1),
                 },
             )
+            figure, axis = plt.subplots(figsize=(11, 4))
+            axis.bar(display_labels, validation_results["f1"])
+            axis.set(title="F1 per klasse", xlabel="Symbool", ylabel="F1", ylim=(0, 1))
+            st.pyplot(figure)
 
-    with pipeline_tab:
-        st.subheader("Detector → classifier evaluatie")
-        st.write(
-            "Meet eerst of YOLO ieder symbool vindt en daarna of de geselecteerde "
-            "classifier de gevonden crop correct herkent. Voorspellingen worden "
-            "één-op-één aan annotaties gekoppeld met intersection-over-union (IoU)."
-        )
-        detector_models = available_detector_models()
-        pipeline_images = [
-            image_path
-            for image_path in project_images(PIPELINE_DATA_DIR / "images" / "val")
-            if (PIPELINE_DATA_DIR / "labels" / "val" / f"{image_path.stem}.txt").is_file()
-        ]
-        if not detector_models:
-            st.warning("Geen detectorcheckpoint gevonden onder runs/detect/*/weights/best.pt.")
-        elif not pipeline_images:
-            st.warning("Geen complete validatieafbeelding met YOLO-labelbestand gevonden.")
-        else:
-            with st.form("pipeline_evaluation_form"):
-                pipeline_controls = st.columns(5)
-                detector_name = pipeline_controls[0].selectbox(
-                    "Detectorrun", tuple(detector_models)
-                )
-                pipeline_image = pipeline_controls[1].selectbox(
-                    "Validatiepagina", pipeline_images, format_func=lambda path: path.name
-                )
-                confidence_threshold = pipeline_controls[2].slider(
-                    "Detector confidence", 0.01, 0.95, 0.25, 0.01
-                )
-                iou_threshold = pipeline_controls[3].slider(
-                    "Match-IoU", 0.10, 0.90, 0.50, 0.05
-                )
-                detector_image_size = pipeline_controls[4].selectbox(
-                    "YOLO-resolutie", (640, 960, 1280), index=1
-                )
-                run_pipeline = st.form_submit_button(
-                    "Voer end-to-end evaluatie uit", type="primary"
-                )
-
-            st.caption(
-                f"Classifier: {selected_model['model_name']} / {selected_model['run_id']} · "
-                f"detector: {detector_name}. De huidige validatieset bevat slechts één "
-                "bronpagina; dit is nog geen onafhankelijke generalisatietest."
+        with confusion_tab:
+            selected_split = st.radio(
+                "Gegevens",
+                ("Validatie", "Training"),
+                horizontal=True,
+                help="Training laat zien wat het model op geleerde voorbeelden doet; validatie is de relevantere controle.",
             )
-            if run_pipeline:
-                detector_path = detector_models[detector_name]
-                label_path = (
-                    PIPELINE_DATA_DIR / "labels" / "val" / f"{pipeline_image.stem}.txt"
-                )
-                pipeline_results = evaluate_pipeline(
-                    str(detector_path),
-                    str(selected_model_path),
-                    str(pipeline_image),
-                    str(label_path),
-                    tuple(validation_results["class_names"]),
-                    float(confidence_threshold),
-                    float(iou_threshold),
-                    int(detector_image_size),
-                    detector_path.stat().st_mtime_ns,
-                    selected_model_path.stat().st_mtime_ns,
-                    pipeline_image.stat().st_mtime_ns,
-                    label_path.stat().st_mtime_ns,
-                )
-                pipeline_metrics_result = pipeline_results["metrics"]
-                metric_columns = st.columns(6)
-                metric_columns[0].metric(
-                    "Detectie precision",
-                    f"{pipeline_metrics_result['detection_precision']:.1%}",
-                )
-                metric_columns[1].metric(
-                    "Detectie recall", f"{pipeline_metrics_result['detection_recall']:.1%}"
-                )
-                metric_columns[2].metric(
-                    "Classificatie op matches",
-                    f"{pipeline_metrics_result['classification_accuracy_on_matches']:.1%}",
-                )
-                metric_columns[3].metric(
-                    "End-to-end precision",
-                    f"{pipeline_metrics_result['end_to_end_precision']:.1%}",
-                )
-                metric_columns[4].metric(
-                    "End-to-end recall",
-                    f"{pipeline_metrics_result['end_to_end_recall']:.1%}",
-                )
-                metric_columns[5].metric(
-                    "End-to-end F1", f"{pipeline_metrics_result['end_to_end_f1']:.1%}"
-                )
+            normalized = st.toggle("Normaliseer per werkelijke klasse", value=True)
+            matrix_results = validation_results if selected_split == "Validatie" else training_results
+            st.metric(f"Accuracy op {selected_split.lower()}", f"{matrix_results['accuracy']:.1%}")
+            st.pyplot(confusion_figure(matrix_results["confusion"], display_labels, normalized))
 
-                outcome_columns = st.columns(4)
-                outcome_columns[0].metric("Correct", pipeline_metrics_result["correct"])
-                outcome_columns[1].metric(
-                    "Verkeerd geclassificeerd", pipeline_metrics_result["misclassified"]
-                )
-                outcome_columns[2].metric("Gemist", pipeline_metrics_result["missed"])
-                outcome_columns[3].metric(
-                    "Extra detecties", pipeline_metrics_result["false_positives"]
-                )
-
-                annotated_image = pipeline_annotation(
-                    load_rgb_image(pipeline_image), pipeline_results, symbols
-                )
-                st.image(
-                    annotated_image,
-                    caption=(
-                        "Groen: volledig correct · oranje: verkeerde klasse · "
-                        "rood: gemiste annotatie · blauw: extra detectie"
+        with errors_tab:
+            errors = np.flatnonzero(validation_results["actual"] != validation_results["predicted"])
+            st.write(
+                f"{len(errors)} van de {len(validation_results['actual'])} "
+                "validatiebeelden zijn verkeerd geclassificeerd."
+            )
+            if len(errors):
+                selected = st.selectbox(
+                    "Foutvoorbeeld",
+                    errors.tolist(),
+                    format_func=lambda index: (
+                        f"{Path(validation_results['file_paths'][index]).name}: "
+                        f"{display_labels[validation_results['actual'][index]]} → "
+                        f"{display_labels[validation_results['predicted'][index]]}"
                     ),
-                    width="stretch",
+                )
+                predicted_index = validation_results["predicted"][selected]
+                st.image(validation_results["file_paths"][selected], width=240)
+                st.write({
+                    "Werkelijk": display_labels[validation_results["actual"][selected]],
+                    "Voorspeld": display_labels[predicted_index],
+                    "Zekerheid": f"{validation_results['probabilities'][selected, predicted_index]:.1%}",
+                })
+
+        with inference_tab:
+            st.write(f"Test {selected_model['label']} met een uitgesneden symbool.")
+            source = st.radio("Afbeeldingsbron", ("Projectbestand", "Uploaden"), horizontal=True)
+            selected_image = None
+
+            if source == "Projectbestand":
+                directory_label = st.selectbox("Projectmap", tuple(PROJECT_IMAGE_DIRS))
+                directory = PROJECT_IMAGE_DIRS[directory_label]
+                available_images = project_images(directory)
+                if available_images:
+                    selected_image = st.selectbox(
+                        "Afbeelding",
+                        available_images,
+                        format_func=lambda path: str(path.relative_to(directory)),
+                    )
+                else:
+                    st.warning(f"Geen afbeeldingen gevonden in {directory}.")
+            else:
+                selected_image = st.file_uploader(
+                    "Afbeelding", type=tuple(extension.removeprefix(".") for extension in IMAGE_EXTENSIONS)
                 )
 
-                actual_classes = pipeline_results["ground_truth_class_ids"]
-                predicted_classes = pipeline_results["predicted_class_ids"]
-                ground_truth_to_prediction = pipeline_results[
-                    "ground_truth_to_prediction"
-                ]
-                per_class_rows = []
-                for class_id, symbol in enumerate(symbols):
-                    ground_truth_indices = np.flatnonzero(actual_classes == class_id)
-                    detected_indices = [
-                        index
-                        for index in ground_truth_indices
-                        if ground_truth_to_prediction[index] >= 0
-                    ]
-                    correct = sum(
-                        predicted_classes[ground_truth_to_prediction[index]] == class_id
-                        for index in detected_indices
-                    )
-                    support = len(ground_truth_indices)
-                    per_class_rows.append(
-                        {
-                            "Symbool": symbol,
-                            "Werkelijk": support,
-                            "Gedetecteerd": len(detected_indices),
-                            "Correct end-to-end": int(correct),
-                            "Detectie recall": (
-                                len(detected_indices) / support if support else 0.0
-                            ),
-                            "End-to-end recall": correct / support if support else 0.0,
-                        }
-                    )
-                st.subheader("Resultaat per klasse")
+            if selected_image is not None:
+                with Image.open(selected_image) as source_image:
+                    image = source_image.convert("RGB")
+                array = np.asarray(image.resize(IMAGE_SIZE), dtype=np.float32)[None, ...]
+                model = load_inference_model(
+                    str(selected_model_path), selected_model_path.stat().st_mtime_ns
+                )
+                probabilities = model.predict(array, verbose=0)[0]
+                top_indices = np.argsort(probabilities)[::-1][:5]
+                st.image(image, width=280)
+                st.success(
+                    f"Voorspelling: {display_labels[top_indices[0]]} "
+                    f"({probabilities[top_indices[0]]:.1%} zekerheid)"
+                )
                 st.dataframe(
-                    per_class_rows,
+                    [
+                        {
+                            "Klasse": validation_results["class_names"][index],
+                            "Symbool": display_labels[index],
+                            "Zekerheid": float(probabilities[index]),
+                        }
+                        for index in top_indices
+                    ],
                     hide_index=True,
                     width="stretch",
                     column_config={
-                        "Detectie recall": st.column_config.ProgressColumn(
+                        "Zekerheid": st.column_config.ProgressColumn(
                             format="percent", min_value=0, max_value=1
-                        ),
-                        "End-to-end recall": st.column_config.ProgressColumn(
-                            format="percent", min_value=0, max_value=1
-                        ),
+                        )
                     },
                 )
-                error_rows = pipeline_error_rows(pipeline_results, symbols)
-                st.subheader("Foutuitsplitsing")
-                if error_rows:
+
+        with pipeline_tab:
+            st.subheader("Detector → classifier evaluatie")
+            st.write(
+                "Meet eerst of YOLO ieder symbool vindt en daarna of de geselecteerde "
+                "classifier de gevonden crop correct herkent. Voorspellingen worden "
+                "één-op-één aan annotaties gekoppeld met intersection-over-union (IoU)."
+            )
+            detector_models = available_detector_models()
+            pipeline_images = [
+                image_path
+                for image_path in project_images(PIPELINE_DATA_DIR / "images" / "val")
+                if (PIPELINE_DATA_DIR / "labels" / "val" / f"{image_path.stem}.txt").is_file()
+            ]
+            if not detector_models:
+                st.warning("Geen detectorcheckpoint gevonden onder runs/detect/*/weights/best.pt.")
+            elif not pipeline_images:
+                st.warning("Geen complete validatieafbeelding met YOLO-labelbestand gevonden.")
+            else:
+                with st.form("pipeline_evaluation_form"):
+                    pipeline_controls = st.columns(5)
+                    detector_name = pipeline_controls[0].selectbox(
+                        "Detectorrun", tuple(detector_models)
+                    )
+                    pipeline_image = pipeline_controls[1].selectbox(
+                        "Validatiepagina", pipeline_images, format_func=lambda path: path.name
+                    )
+                    confidence_threshold = pipeline_controls[2].slider(
+                        "Detector confidence", 0.01, 0.95, 0.25, 0.01
+                    )
+                    iou_threshold = pipeline_controls[3].slider(
+                        "Match-IoU", 0.10, 0.90, 0.50, 0.05
+                    )
+                    detector_image_size = pipeline_controls[4].selectbox(
+                        "YOLO-resolutie", (640, 960, 1280), index=1
+                    )
+                    run_pipeline = st.form_submit_button(
+                        "Voer end-to-end evaluatie uit", type="primary"
+                    )
+
+                st.caption(
+                    f"Classifier: {selected_model['model_name']} / {selected_model['run_id']} · "
+                    f"detector: {detector_name}. De huidige validatieset bevat slechts één "
+                    "bronpagina; dit is nog geen onafhankelijke generalisatietest."
+                )
+                if run_pipeline:
+                    detector_path = detector_models[detector_name]
+                    label_path = (
+                        PIPELINE_DATA_DIR / "labels" / "val" / f"{pipeline_image.stem}.txt"
+                    )
+                    pipeline_results = evaluate_pipeline(
+                        str(detector_path),
+                        str(selected_model_path),
+                        str(pipeline_image),
+                        str(label_path),
+                        tuple(validation_results["class_names"]),
+                        float(confidence_threshold),
+                        float(iou_threshold),
+                        int(detector_image_size),
+                        detector_path.stat().st_mtime_ns,
+                        selected_model_path.stat().st_mtime_ns,
+                        pipeline_image.stat().st_mtime_ns,
+                        label_path.stat().st_mtime_ns,
+                    )
+                    pipeline_metrics_result = pipeline_results["metrics"]
+                    metric_columns = st.columns(6)
+                    metric_columns[0].metric(
+                        "Detectie precision",
+                        f"{pipeline_metrics_result['detection_precision']:.1%}",
+                    )
+                    metric_columns[1].metric(
+                        "Detectie recall", f"{pipeline_metrics_result['detection_recall']:.1%}"
+                    )
+                    metric_columns[2].metric(
+                        "Classificatie op matches",
+                        f"{pipeline_metrics_result['classification_accuracy_on_matches']:.1%}",
+                    )
+                    metric_columns[3].metric(
+                        "End-to-end precision",
+                        f"{pipeline_metrics_result['end_to_end_precision']:.1%}",
+                    )
+                    metric_columns[4].metric(
+                        "End-to-end recall",
+                        f"{pipeline_metrics_result['end_to_end_recall']:.1%}",
+                    )
+                    metric_columns[5].metric(
+                        "End-to-end F1", f"{pipeline_metrics_result['end_to_end_f1']:.1%}"
+                    )
+
+                    outcome_columns = st.columns(4)
+                    outcome_columns[0].metric("Correct", pipeline_metrics_result["correct"])
+                    outcome_columns[1].metric(
+                        "Verkeerd geclassificeerd", pipeline_metrics_result["misclassified"]
+                    )
+                    outcome_columns[2].metric("Gemist", pipeline_metrics_result["missed"])
+                    outcome_columns[3].metric(
+                        "Extra detecties", pipeline_metrics_result["false_positives"]
+                    )
+
+                    annotated_image = pipeline_annotation(
+                        load_rgb_image(pipeline_image), pipeline_results, symbols
+                    )
+                    st.image(
+                        annotated_image,
+                        caption=(
+                            "Groen: volledig correct · oranje: verkeerde klasse · "
+                            "rood: gemiste annotatie · blauw: extra detectie"
+                        ),
+                        width="stretch",
+                    )
+
+                    actual_classes = pipeline_results["ground_truth_class_ids"]
+                    predicted_classes = pipeline_results["predicted_class_ids"]
+                    ground_truth_to_prediction = pipeline_results[
+                        "ground_truth_to_prediction"
+                    ]
+                    per_class_rows = []
+                    for class_id, symbol in enumerate(symbols):
+                        ground_truth_indices = np.flatnonzero(actual_classes == class_id)
+                        detected_indices = [
+                            index
+                            for index in ground_truth_indices
+                            if ground_truth_to_prediction[index] >= 0
+                        ]
+                        correct = sum(
+                            predicted_classes[ground_truth_to_prediction[index]] == class_id
+                            for index in detected_indices
+                        )
+                        support = len(ground_truth_indices)
+                        per_class_rows.append(
+                            {
+                                "Symbool": symbol,
+                                "Werkelijk": support,
+                                "Gedetecteerd": len(detected_indices),
+                                "Correct end-to-end": int(correct),
+                                "Detectie recall": (
+                                    len(detected_indices) / support if support else 0.0
+                                ),
+                                "End-to-end recall": correct / support if support else 0.0,
+                            }
+                        )
+                    st.subheader("Resultaat per klasse")
                     st.dataframe(
-                        error_rows,
+                        per_class_rows,
                         hide_index=True,
                         width="stretch",
                         column_config={
-                            "Detector confidence": st.column_config.NumberColumn(
-                                format="percent"
+                            "Detectie recall": st.column_config.ProgressColumn(
+                                format="percent", min_value=0, max_value=1
                             ),
-                            "IoU": st.column_config.NumberColumn(format="%.3f"),
+                            "End-to-end recall": st.column_config.ProgressColumn(
+                                format="percent", min_value=0, max_value=1
+                            ),
                         },
                     )
-                else:
-                    st.success("Geen end-to-end fouten bij deze instellingen.")
+                    error_rows = pipeline_error_rows(pipeline_results, symbols)
+                    st.subheader("Foutuitsplitsing")
+                    if error_rows:
+                        st.dataframe(
+                            error_rows,
+                            hide_index=True,
+                            width="stretch",
+                            column_config={
+                                "Detector confidence": st.column_config.NumberColumn(
+                                    format="percent"
+                                ),
+                                "IoU": st.column_config.NumberColumn(format="%.3f"),
+                            },
+                        )
+                    else:
+                        st.success("Geen end-to-end fouten bij deze instellingen.")
+
+    else:
+        for tab in (performance_tab, confusion_tab, errors_tab, inference_tab, pipeline_tab):
+            with tab:
+                st.info("Train eerst een model via Model trainen om deze resultaten te bekijken.")
 
     with dataset_tab:
         st.subheader("Klasseverdeling")
         st.write("Bekijk hoe de voorbeelden over de 15 klassen zijn verdeeld.")
-        train_counts = class_counts(DATA_DIR / "train", validation_results["class_names"])
-        validation_counts = class_counts(DATA_DIR / "val", validation_results["class_names"])
+        train_counts = class_counts(DATA_DIR / "train", class_names)
+        validation_counts = class_counts(DATA_DIR / "val", class_names)
         total_counts = train_counts + validation_counts
         selected_dataset = st.radio(
             "Datasetdeel",
@@ -1170,7 +1179,7 @@ def main() -> None:
                         float(selected_counts[index] / selected_total) if selected_total else 0.0
                     ),
                 }
-                for index, folder in enumerate(validation_results["class_names"])
+                for index, folder in enumerate(class_names)
             ],
             hide_index=True,
             width="stretch",
@@ -1209,7 +1218,7 @@ def main() -> None:
         comparison_directory = DATA_DIR / (
             "train" if comparison_split == "Training" else "val"
         )
-        comparison_classes = validation_results["class_names"]
+        comparison_classes = class_names
         class_labels = {
             folder: f"{symbol_for(folder, symbols)} ({folder})"
             for folder in comparison_classes

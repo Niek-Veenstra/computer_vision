@@ -12,7 +12,7 @@ export class ApiError extends Error {
 }
 
 const instance = createFetch({
-  baseUrl: 'http://localhost:3000',
+  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000',
   options: {
     onFetchError({ response, data, error }) {
       const status = response?.status ?? 0

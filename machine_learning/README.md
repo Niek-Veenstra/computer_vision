@@ -83,6 +83,21 @@ Evaluatie met `python -m symbol_classifier.assess` vereist ook `symbol_classifie
 
 ### Visueel prestatiedashboard
 
+Op Windows kun je de lokale `.venv` gebruiken via het beheerscript in de projectroot:
+
+```powershell
+.\dashboard.ps1 start
+.\dashboard.ps1 status
+.\dashboard.ps1 stop
+.\dashboard.ps1 restart
+.\dashboard.ps1 logs
+```
+
+Het dashboard staat op `http://localhost:8501`. Gebruik eventueel
+`powershell -ExecutionPolicy Bypass -File .\dashboard.ps1 start` als de lokale
+execution policy scripts blokkeert. Vanuit Git Bash werken dezelfde acties met
+`bash dashboard.sh start` (of `stop`, `restart`, `status`, `logs`).
+
 Het Streamlit-dashboard evalueert een geselecteerd model en toont accuracy, balanced accuracy, macro-F1, precision en recall per klasse, normaliseerbare confusion matrices voor training en validatie, de verkeerd geclassificeerde afbeeldingen en inference op een uitsnede. De modelselector bovenaan bestuurt zowel de getoonde resultaten als inference. De dataset-tab toont de klassebalans als cirkeldiagram en tabel voor de trainingsset, validatieset of beide samen. In **Resize vergelijking** kun je twee train- of validatiebeelden selecteren, ze met de modelresize of een alternatieve interpolatiemethode naar `128×128` schalen en daarna een versterkte diff, rood-cyaan-overlay en gelijkenismaten bekijken. De tab **Training runs** toont de verhouding tussen het aantal gebruikte trainingsafbeeldingen en de gemiddelde validatie-accuracy over de seeds. In de inference-tab kun je direct uit relevante projectmappen kiezen of zelf een bestand uploaden:
 
 ```powershell

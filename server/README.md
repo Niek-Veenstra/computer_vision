@@ -34,7 +34,11 @@ $ npm install
 Copy `.env.example` to `.env` and set the database connection values and
 `JWT_SECRET`. The database settings are required by both the NestJS application
 and the TypeORM data source. `DB_TYPE` currently supports `postgres`.
-The example database credentials match the current `docker-compose.yml`.
+Docker Compose reads the database port, username, password, and database name
+from the same `.env` file. Start the local database with `docker compose up -d`.
+PostgreSQL only applies these credentials when initializing an empty data volume.
+Changing `.env` later also requires updating the credentials in the existing
+database; recreating the container alone does not update them.
 
 ## Documents API
 
